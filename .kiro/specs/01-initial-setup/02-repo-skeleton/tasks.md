@@ -30,7 +30,7 @@
 
 ## 4. Sidecar scaffolds (Req 6)
 - [-] 4.1 `Sidecars/{kpi-anomaly-detector,dlq-cluster-analyzer,capacity-forecast-model,log-normalizer}`: `pyproject.toml` (`[project]` + `requires-python=">=3.11"` + `[build-system]`=hatchling), `src/<pkg>/__init__.py` (`__version__`), `tests/test_smoke.py`, `Dockerfile` (`python:3.11-slim`), `README.md`. (§4.3, Req 6.2)
-- [~] 4.2 `kpi-anomaly-detector/README.md` includes an example output JSON using synthetic `FX-` ids. (§4.3, Req 6.7/13.6)
+- [x] 4.2 `kpi-anomaly-detector/README.md` includes an example output JSON using synthetic `FX-` ids. (§4.3, Req 6.7/13.6)
 - [~] 4.3 `Sidecars/README.md`: detection/embedding-only boundary + MCP_Tool_Contract-compatible envelope note. (§4.3, Req 6.3) **Verify:** Python test runner green in each sidecar; `docker build` succeeds for each.
 
 ## 5. Agents layout (Req 5)
