@@ -65,4 +65,4 @@
 - [~] 10.3 Commit via normal commit / `scripts/commit-specs.sh`.
 
 ---
-**Completion:** 0 / 36 tasks. Update this line as tasks are ticked.
+**Completion:** 14 / 36 tasks. Update this line as tasks are ticked.
