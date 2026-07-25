@@ -326,20 +326,24 @@ Progress is tracked at the **requirements** stage (Kiro `requirements-first` wor
 | 01-initial-setup | 2 | 2 ✅ | 0 | 0 | 0 |
 | architecture-golden-path | 1 | 1 ✅ | n/a | n/a | 0 |
 | 02-microservices | 7 | 7 ✅ | 7 ✅ | 7 ✅ | 0 |
-| 03-events | 4 | 4 ✅ | 0 | 0 | 0 |
+| 03-events | 4 | 4 ✅ | 4 ✅ | 4 ✅ | 0 |
 | 04-portals | 3 | 3 ✅ | 0 | 0 | 0 |
 | 05-observability | 4 | 4 ✅ | 0 | 0 | 0 |
 | 06-local-deploy | 3 | 3 ✅ | 0 | 0 | 0 |
 | 07-n8n-agents | 34 | 0 | 0 | 0 | 34 |
 | 08-aws-deploy | 7 | 0 | 0 | 0 | 7 |
 | 09-azure-deploy | 6 | 0 | 0 | 0 | 6 |
-| **Total** | **71** | **24 ✅** | **7** | **7** | **47** |
+| **Total** | **71** | **24 ✅** | **11** | **11** | **47** |
 
 **Requirements baseline phases 01–06: COMPLETE ✅** (24 of 24 specs done, 2026-07-25)
 **Phase 02 microservices: req→design→tasks COMPLETE ✅** (all 7 bounded contexts fully specced, 2026-07-25)
 
 Next spec work (staying in the three-doc flow through Phase 06-local-deploy, no code yet):
-`03-events` (4), `04-portals` (3), `05-observability` (4), `06-local-deploy` (3) each need design.md + tasks.md; `01-initial-setup/02-repo-skeleton` needs design.md + tasks.md. (`01-technology-stack` and `architecture-golden-path/01-service-nfrs` are registry/reference specs — realized inside each service's design, no separate design/tasks.)
+`04-portals` (3), `05-observability` (4), `06-local-deploy` (3) each need design.md + tasks.md; `01-initial-setup/02-repo-skeleton` needs design.md + tasks.md. (`01-technology-stack` and `architecture-golden-path/01-service-nfrs` are registry/reference specs — realized inside each service's design, no separate design/tasks.) ✅ `02-microservices` and `03-events` design+tasks COMPLETE.
+
+## Open cross-spec items (surfaced during design, to reconcile before code)
+
+- **OPEN-1 — TradeEventType enum gap.** The `03-events/02-domain-events-model` design catalogues event contracts required by other specs that are NOT among the 15 `TradeEventType` constants in the `shared-domain-contracts` shared kernel: `RISK_CALCULATION_FAILED`, the EOD status/completion event family, and `REPLAY_REQUESTED`. Resolution: extend the shared-kernel `TradeEventType` enum (backward-compatible addition) and update `01-shared-domain-contracts` requirements/design/tasks accordingly, before implementing the event-driven services. Tracked so it is not silently invented in code.
 
 **Refactor backlog** — ✅ **COMPLETE for all microservices.** Every `02-microservices` spec is now technology-agnostic (Technology Roles only — verified: zero product names/versions), business/domain-only (cross-cutting NFRs inherited from `architecture-golden-path/01-service-nfrs` via `(inherited GP-Rq-N)`), and DDD-framed (bounded contexts; `01-shared-domain-contracts` = shared kernel). Requirement counts: shared-kernel 12, trade-capture 5, trade-lifecycle 7, risk 8, eod 7, calendar 6, state-reconciliation 8.
 - ⬜ Remaining: `02-repo-skeleton` still needs an agnostic pass (not a service, so no golden-path inheritance — just replace product/version names with Technology Roles).
