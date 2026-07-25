@@ -26,10 +26,10 @@
 ## 3. Portal scaffolds (Req 4)
 - [x] 3.1 `Portals/{Admin,TraderDesk,FXTradeBlotter}` Angular 19 standalone scaffolds: `package.json`, `angular.json`, `tsconfig.json`, `.editorconfig` (inherits root), `src/index.html`, `src/main.ts` (`bootstrapApplication`), standalone `AppComponent`. (§4.2, Req 4.1/4.2/4.4)
 - [x] 3.2 Pin `@angular/*` at the same major (19.x) across all three portals. (§4.2, Req 4.3/4.8)
-- [~] 3.3 Per-portal `README.md`: Admin=ops/risk admin, TraderDesk=customer trader portal, FXTradeBlotter=broker trade blotter, each listing placeholder route paths. (Req 4.5/4.6/4.7) **Verify:** `ng build` in each portal produces a prod bundle, no legacy module declarations.
+- [-] 3.3 Per-portal `README.md`: Admin=ops/risk admin, TraderDesk=customer trader portal, FXTradeBlotter=broker trade blotter, each listing placeholder route paths. (Req 4.5/4.6/4.7) **Verify:** `ng build` in each portal produces a prod bundle, no legacy module declarations.
 
 ## 4. Sidecar scaffolds (Req 6)
-- [~] 4.1 `Sidecars/{kpi-anomaly-detector,dlq-cluster-analyzer,capacity-forecast-model,log-normalizer}`: `pyproject.toml` (`[project]` + `requires-python=">=3.11"` + `[build-system]`=hatchling), `src/<pkg>/__init__.py` (`__version__`), `tests/test_smoke.py`, `Dockerfile` (`python:3.11-slim`), `README.md`. (§4.3, Req 6.2)
+- [-] 4.1 `Sidecars/{kpi-anomaly-detector,dlq-cluster-analyzer,capacity-forecast-model,log-normalizer}`: `pyproject.toml` (`[project]` + `requires-python=">=3.11"` + `[build-system]`=hatchling), `src/<pkg>/__init__.py` (`__version__`), `tests/test_smoke.py`, `Dockerfile` (`python:3.11-slim`), `README.md`. (§4.3, Req 6.2)
 - [~] 4.2 `kpi-anomaly-detector/README.md` includes an example output JSON using synthetic `FX-` ids. (§4.3, Req 6.7/13.6)
 - [~] 4.3 `Sidecars/README.md`: detection/embedding-only boundary + MCP_Tool_Contract-compatible envelope note. (§4.3, Req 6.3) **Verify:** Python test runner green in each sidecar; `docker build` succeeds for each.
 
