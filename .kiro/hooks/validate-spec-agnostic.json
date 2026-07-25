@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Validate spec is technology-agnostic",
+      "trigger": "PostFileSave",
+      "matcher": "\\.kiro/specs/.*/requirements\\.md$",
+      "action": {
+        "type": "command",
+        "command": "FILE=\"{{filePath}}\"; BANNED=$(grep -nE '(Spring Boot|PostgreSQL|\\bRedis\\b|\\bMongoDB\\b|\\bNeo4j\\b|\\bAngular\\b|\\bKafka\\b|\\bDrools\\b|Java 21|python:3\\.|3\\.4\\.x|version.*[0-9]+\\.[0-9]+\\.[0-9]+)' \"$FILE\" 2>/dev/null | grep -v 'Technology Role' | grep -v 'technology-stack' | grep -v 'Glossary' | head -5); if [ -n \"$BANNED\" ]; then echo \"⚠️  AGNOSTIC VIOLATION in $FILE — product names or versions found:\"; echo \"$BANNED\"; echo \"Replace with Technology Roles from 01-technology-stack.\"; fi"
+      }
+    }
+  ]
+}

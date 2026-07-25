@@ -191,10 +191,10 @@ Each is a standalone Spring Boot Maven module under `Middleware/`. Built as plai
 
 | Spec | Status | Scope |
 |---|---|---|
-| `03-events/01-kafka-topic-design` | ⬜ Not started | Topic naming conventions, partition strategy, replication factor, schema registry setup, retention policy per topic |
-| `03-events/02-domain-events-model` | ⬜ Not started | Full Avro/JSON schema catalogue: TradeCaptured → TradeSettled + amendment/cancellation/replay events, field-level documentation |
-| `03-events/03-event-sequence-processor` | ⬜ Not started | Kafka Streams processor maintaining per-tradeId sequence facts {observedEvents, missingEvents, duplicates, sequenceViolations}, emits anomaly envelope on violation |
-| `03-events/04-dlq-management` | ⬜ Not started | DLQ topic naming, retry policy per topic, poison message quarantine strategy, DLQ consumer monitoring |
+| `03-events/01-kafka-topic-design` | ✅ Requirements done | Topic naming conventions, partition strategy, replication factor, schema registry setup, retention policy per topic |
+| `03-events/02-domain-events-model` | ✅ Requirements done | Full event schema catalogue: TradeCaptured → TradeSettled + amendment/cancellation/replay events, field-level documentation |
+| `03-events/03-event-sequence-processor` | ✅ Requirements done | STREAM_PROCESSING processor maintaining per-tradeId sequence facts {observedEvents, missingEvents, duplicates, sequenceViolations}, emits anomaly envelope on violation |
+| `03-events/04-dlq-management` | ✅ Requirements done | DLQ topic naming, retry policy per topic, poison message quarantine strategy, DLQ consumer monitoring |
 
 ---
 
@@ -204,9 +204,9 @@ Each is a standalone Angular app under `Portals/` with its own package.json.
 
 | Spec | Status | Scope |
 |---|---|---|
-| `04-portals/01-portal-admin` | ⬜ Not started | Ops/risk admin portal — trade investigation, EOD status dashboard, risk aggregation views, exception management, n8n approval workflow UI integration |
-| `04-portals/02-portal-traderdesk` | ⬜ Not started | Customer trader portal — trade lifecycle status, risk explanation views, position summary, trading book view |
-| `04-portals/03-portal-fxtradeblotter` | ⬜ Not started | Broker blotter — real-time position, exposure, settlement status, counterparty exposure |
+| `04-portals/01-portal-admin` | ✅ Requirements done | Ops/risk admin portal — trade investigation, EOD status dashboard, risk aggregation views, exception management, n8n approval workflow UI integration |
+| `04-portals/02-portal-traderdesk` | ✅ Requirements done | Customer trader portal — trade lifecycle status, risk explanation views, position summary, trading book view |
+| `04-portals/03-portal-fxtradeblotter` | ✅ Requirements done | Broker blotter — real-time position, exposure, settlement status, counterparty exposure |
 
 ---
 
@@ -216,10 +216,10 @@ Instrument the running application. No new business logic.
 
 | Spec | Status | Scope |
 |---|---|---|
-| `05-observability/01-otel-spring-boot` | ⬜ Not started | OTel auto-instrumentation for all Middleware services, span naming, W3C TraceContext propagation, tradeId/region baggage |
-| `05-observability/02-otel-kafka-tracing` | ⬜ Not started | W3C trace context through Kafka headers, producer/consumer span correlation |
-| `05-observability/03-otel-metrics-dashboards` | ⬜ Not started | Grafana dashboards per service, Prometheus scrape config, alert rules for trade throughput/risk latency/EOD completion |
-| `05-observability/04-otel-log-correlation` | ⬜ Not started | ELK pipeline, structured logging with traceId/spanId/tradeId, Logstash pipelines, Kibana index patterns |
+| `05-observability/01-otel-spring-boot` | ✅ Requirements done | OTel auto-instrumentation for all Middleware services, span naming, W3C TraceContext propagation, tradeId/region baggage |
+| `05-observability/02-otel-kafka-tracing` | ✅ Requirements done | W3C trace context through Kafka headers, producer/consumer span correlation |
+| `05-observability/03-otel-metrics-dashboards` | ✅ Requirements done | Grafana dashboards per service, Prometheus scrape config, alert rules for trade throughput/risk latency/EOD completion |
+| `05-observability/04-otel-log-correlation` | ✅ Requirements done | ELK pipeline, structured logging with traceId/spanId/tradeId, Logstash pipelines, Kibana index patterns |
 
 ---
 
@@ -227,9 +227,9 @@ Instrument the running application. No new business logic.
 
 | Spec | Status | Scope |
 |---|---|---|
-| `06-local-deploy/01-mcp-server-setup` | ⬜ Not started | Add Spring AI MCP server to Middleware services, shared-mcp-contracts library, agent envelope DTOs, tool registration, local MCP gateway config |
-| `06-local-deploy/02-python-sidecars` | ⬜ Not started | Build and run 4 Python detection sidecars locally (kpi-anomaly-detector, dlq-cluster-analyzer, capacity-forecast-model, log-normalizer), sidecar → n8n webhook trigger wiring |
-| `06-local-deploy/03-n8n-local-setup` | ⬜ Not started | n8n local instance config, import workflow JSONs, MCP client credentials, webhook endpoints, test end-to-end tool call from n8n → Spring Boot MCP |
+| `06-local-deploy/01-mcp-server-setup` | ✅ Requirements done | Add Spring AI MCP server to Middleware services, shared-mcp-contracts library, agent envelope DTOs, tool registration, local MCP gateway config |
+| `06-local-deploy/02-python-sidecars` | ✅ Requirements done | Build and run 4 Python detection sidecars locally (kpi-anomaly-detector, dlq-cluster-analyzer, capacity-forecast-model, log-normalizer), sidecar → n8n webhook trigger wiring |
+| `06-local-deploy/03-n8n-local-setup` | ✅ Requirements done | n8n local instance config, import workflow JSONs, MCP client credentials, webhook endpoints, test end-to-end tool call from n8n → Spring Boot MCP |
 
 ---
 
@@ -321,19 +321,21 @@ All implemented as n8n workflow JSON exports only. No Python agent scripts.
 
 Progress is tracked at the **requirements** stage (Kiro `requirements-first` workflow). "Done" = `requirements.md` complete; `design.md` and `tasks.md` follow in a later pass.
 
-| Phase | Total Specs | Requirements Done | Remaining |
-|---|---|---|---|
-| 01-initial-setup | 2 | 2 ✅ | 0 |
-| architecture-golden-path | 1 | 1 ✅ | 0 |
-| 02-microservices | 7 | 7 ✅ | 0 |
-| 03-events | 4 | 0 | 4 |
-| 04-portals | 3 | 0 | 3 |
-| 05-observability | 4 | 0 | 4 |
-| 06-local-deploy | 3 | 0 | 3 |
-| 07-n8n-agents | 34 | 0 | 34 |
-| 08-aws-deploy | 7 | 0 | 7 |
-| 09-azure-deploy | 6 | 0 | 6 |
-| **Total** | **71** | **10** | **61** |
+| Phase | Total Specs | Requirements Done | Design Done | Tasks Done | Remaining (req) |
+|---|---|---|---|---|---|
+| 01-initial-setup | 2 | 2 ✅ | 0 | 0 | 0 |
+| architecture-golden-path | 1 | 1 ✅ | n/a | n/a | 0 |
+| 02-microservices | 7 | 7 ✅ | 1 ✅ | 1 ✅ | 0 |
+| 03-events | 4 | 4 ✅ | 0 | 0 | 0 |
+| 04-portals | 3 | 3 ✅ | 0 | 0 | 0 |
+| 05-observability | 4 | 4 ✅ | 0 | 0 | 0 |
+| 06-local-deploy | 3 | 3 ✅ | 0 | 0 | 0 |
+| 07-n8n-agents | 34 | 0 | 0 | 0 | 34 |
+| 08-aws-deploy | 7 | 0 | 0 | 0 | 7 |
+| 09-azure-deploy | 6 | 0 | 0 | 0 | 6 |
+| **Total** | **71** | **24 ✅** | **1** | **1** | **47** |
+
+**Requirements baseline phases 01–06: COMPLETE ✅** (24 of 24 specs done, 2026-07-25)
 
 **Refactor backlog** — ✅ **COMPLETE for all microservices.** Every `02-microservices` spec is now technology-agnostic (Technology Roles only — verified: zero product names/versions), business/domain-only (cross-cutting NFRs inherited from `architecture-golden-path/01-service-nfrs` via `(inherited GP-Rq-N)`), and DDD-framed (bounded contexts; `01-shared-domain-contracts` = shared kernel). Requirement counts: shared-kernel 12, trade-capture 5, trade-lifecycle 7, risk 8, eod 7, calendar 6, state-reconciliation 8.
 - ⬜ Remaining: `02-repo-skeleton` still needs an agnostic pass (not a service, so no golden-path inheritance — just replace product/version names with Technology Roles).
