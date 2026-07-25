@@ -327,13 +327,13 @@ Progress is tracked at the **requirements** stage (Kiro `requirements-first` wor
 | architecture-golden-path | 1 | 1 ✅ | n/a | n/a | 0 |
 | 02-microservices | 7 | 7 ✅ | 7 ✅ | 7 ✅ | 0 |
 | 03-events | 4 | 4 ✅ | 4 ✅ | 4 ✅ | 0 |
-| 04-portals | 3 | 3 ✅ | 0 | 0 | 0 |
+| 04-portals | 3 | 3 ✅ | 3 ✅ | 3 ✅ | 0 |
 | 05-observability | 4 | 4 ✅ | 0 | 0 | 0 |
 | 06-local-deploy | 3 | 3 ✅ | 0 | 0 | 0 |
 | 07-n8n-agents | 34 | 0 | 0 | 0 | 34 |
 | 08-aws-deploy | 7 | 0 | 0 | 0 | 7 |
 | 09-azure-deploy | 6 | 0 | 0 | 0 | 6 |
-| **Total** | **71** | **24 ✅** | **11** | **11** | **47** |
+| **Total** | **71** | **24 ✅** | **14** | **14** | **47** |
 
 **Requirements baseline phases 01–06: COMPLETE ✅** (24 of 24 specs done, 2026-07-25)
 **Phase 02 microservices: req→design→tasks COMPLETE ✅** (all 7 bounded contexts fully specced, 2026-07-25)
