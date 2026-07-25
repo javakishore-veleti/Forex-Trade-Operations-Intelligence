@@ -8,20 +8,20 @@
 
 ## 0. Repository root layout
 - [x] 0.1 Create top-level directories `Middleware/`, `Portals/`, `Agents/`, `Sidecars/`, `DevOps/Local/`, `docs/`, `.github/`, `scripts/`. (§2, Req 1.1)
-- [~] 0.2 Root `README.md`: platform purpose, top-level directory roles, link to architectural-constraints doc, synthetic-`FX-`-data statement. **Verify:** every top-level directory has a `README.md`. (§2, Req 1.2/1.3/1.5)
+- [x] 0.2 Root `README.md`: platform purpose, top-level directory roles, link to architectural-constraints doc, synthetic-`FX-`-data statement. **Verify:** every top-level directory has a `README.md`. (§2, Req 1.2/1.3/1.5)
 
 ## 1. Parent Maven POM (Req 2)
-- [~] 1.1 `Middleware/pom.xml` — `com.fxtradeops:fxtradeops-parent:0.1.0-SNAPSHOT`, `packaging=pom`, `properties` with `maven.compiler.release=21` (SERVICE_LANGUAGE resolved). (§3)
-- [~] 1.2 `<dependencyManagement>` importing the Spring Boot BOM + Spring AI (AGENT_TOOL_PROTOCOL) BOM + Testcontainers BOM, and pinning jqwik (PROPERTY_TEST). (§3, Req 2.2)
-- [~] 1.3 `<pluginManagement>`: `maven-compiler-plugin` (`release=21`), `spring-boot-maven-plugin`, `maven-surefire-plugin`. (§3, Req 2.3)
-- [~] 1.4 `<modules>` listing all seven Phase-0 modules. (§3, Req 2.1)
-- [~] 1.5 `Middleware/README.md`: parent structure, Java-21 requirement, how to add a module, initial module list. (§3, Req 2.5) **Verify:** `mvn -N validate` at `Middleware/` succeeds.
+- [x] 1.1 `Middleware/pom.xml` — `com.fxtradeops:fxtradeops-parent:0.1.0-SNAPSHOT`, `packaging=pom`, `properties` with `maven.compiler.release=21` (SERVICE_LANGUAGE resolved). (§3)
+- [x] 1.2 `<dependencyManagement>` importing the Spring Boot BOM + Spring AI (AGENT_TOOL_PROTOCOL) BOM + Testcontainers BOM, and pinning jqwik (PROPERTY_TEST). (§3, Req 2.2)
+- [x] 1.3 `<pluginManagement>`: `maven-compiler-plugin` (`release=21`), `spring-boot-maven-plugin`, `maven-surefire-plugin`. (§3, Req 2.3)
+- [x] 1.4 `<modules>` listing all seven Phase-0 modules. (§3, Req 2.1)
+- [x] 1.5 `Middleware/README.md`: parent structure, Java-21 requirement, how to add a module, initial module list. (§3, Req 2.5) **Verify:** `mvn -N validate` at `Middleware/` succeeds.
 
 ## 2. Service module scaffolds (Req 3)
-- [~] 2.1 `shared-domain-contracts/` — library artifact (parent `fxtradeops-parent`, no `@SpringBootApplication`, no repackaging), shell for `MCP_Tool_Contract` DTOs. (§4.1, Req 3.3/3.4)
-- [~] 2.2 Six runnable service scaffolds `trade-ingest-service`, `trade-lifecycle-service`, `risk-calculation-service`, `eod-processing-service`, `business-calendar-service`, `state-reconciliation-service`: child `pom.xml`→parent, `<Name>Application` (`@SpringBootApplication`), `application.yml` (`spring.application.name` kebab), context-load test. (§4.1, Req 3.1/3.2)
-- [~] 2.3 `state-reconciliation-service` declares the EVENT_STREAM (Spring Kafka) dependency; the other five do not. (§4.1, Req 3.7)
-- [~] 2.4 Per-service `README.md` for each module. (Req 1.3) **Verify:** `mvn -f Middleware/pom.xml verify` — all seven compile, all context-load tests green.
+- [x] 2.1 `shared-domain-contracts/` — library artifact (parent `fxtradeops-parent`, no `@SpringBootApplication`, no repackaging), shell for `MCP_Tool_Contract` DTOs. (§4.1, Req 3.3/3.4)
+- [x] 2.2 Six runnable service scaffolds `trade-ingest-service`, `trade-lifecycle-service`, `risk-calculation-service`, `eod-processing-service`, `business-calendar-service`, `state-reconciliation-service`: child `pom.xml`→parent, `<Name>Application` (`@SpringBootApplication`), `application.yml` (`spring.application.name` kebab), context-load test. (§4.1, Req 3.1/3.2)
+- [x] 2.3 `state-reconciliation-service` declares the EVENT_STREAM (Spring Kafka) dependency; the other five do not. (§4.1, Req 3.7)
+- [x] 2.4 Per-service `README.md` for each module. (Req 1.3) **Verify:** `mvn -f Middleware/pom.xml verify` — all seven compile, all context-load tests green.
 
 ## 3. Portal scaffolds (Req 4)
 - [~] 3.1 `Portals/{Admin,TraderDesk,FXTradeBlotter}` Angular 19 standalone scaffolds: `package.json`, `angular.json`, `tsconfig.json`, `.editorconfig` (inherits root), `src/index.html`, `src/main.ts` (`bootstrapApplication`), standalone `AppComponent`. (§4.2, Req 4.1/4.2/4.4)
