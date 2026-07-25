@@ -24,8 +24,8 @@
 - [x] 2.4 Per-service `README.md` for each module. (Req 1.3) **Verify:** `mvn -f Middleware/pom.xml verify` — all seven compile, all context-load tests green.
 
 ## 3. Portal scaffolds (Req 4)
-- [~] 3.1 `Portals/{Admin,TraderDesk,FXTradeBlotter}` Angular 19 standalone scaffolds: `package.json`, `angular.json`, `tsconfig.json`, `.editorconfig` (inherits root), `src/index.html`, `src/main.ts` (`bootstrapApplication`), standalone `AppComponent`. (§4.2, Req 4.1/4.2/4.4)
-- [~] 3.2 Pin `@angular/*` at the same major (19.x) across all three portals. (§4.2, Req 4.3/4.8)
+- [x] 3.1 `Portals/{Admin,TraderDesk,FXTradeBlotter}` Angular 19 standalone scaffolds: `package.json`, `angular.json`, `tsconfig.json`, `.editorconfig` (inherits root), `src/index.html`, `src/main.ts` (`bootstrapApplication`), standalone `AppComponent`. (§4.2, Req 4.1/4.2/4.4)
+- [x] 3.2 Pin `@angular/*` at the same major (19.x) across all three portals. (§4.2, Req 4.3/4.8)
 - [~] 3.3 Per-portal `README.md`: Admin=ops/risk admin, TraderDesk=customer trader portal, FXTradeBlotter=broker trade blotter, each listing placeholder route paths. (Req 4.5/4.6/4.7) **Verify:** `ng build` in each portal produces a prod bundle, no legacy module declarations.
 
 ## 4. Sidecar scaffolds (Req 6)
