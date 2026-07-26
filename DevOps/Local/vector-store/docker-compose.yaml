@@ -1,0 +1,34 @@
+# Vector Store — pgvector extension on PostgreSQL
+# Role: VECTOR_STORE (similar-incident retrieval, rule corpus search, embedding recall)
+# Uses the same PostgreSQL instance with pgvector extension enabled
+# Alternatively can be swapped for a dedicated vector DB (Qdrant, Weaviate)
+
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: fxops-vector-store
+    environment:
+      POSTGRES_DB: fxops_vectors
+      POSTGRES_USER: fxops_vector
+      POSTGRES_PASSWORD: ${VECTOR_STORE_PASSWORD:-fxops_vector_local}
+    ports:
+      - "5433:5432"
+    volumes:
+      - fxops-vector-data:/var/lib/postgresql/data
+      - ./init-pgvector.sql:/docker-entrypoint-initdb.d/01-init-pgvector.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fxops_vector -d fxops_vectors"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fxops-vector-net
+
+volumes:
+  fxops-vector-data:
+    name: fxops-vector-data
+
+networks:
+  fxops-vector-net:
+    name: fxops-vector-net
+    driver: bridge
