@@ -156,6 +156,40 @@ requirements.md  →  design.md  →  tasks.md  →  code
 
 ---
 
+## Use Cases & Personas
+
+This platform serves **8 personas** across **50 documented use cases** — see [docs/use-cases.md](docs/use-cases.md) for full details.
+
+### Personas
+
+| Persona | Portal | Role |
+|---|---|---|
+| FX Trader | TraderDesk | Views trade status, risk explanations, positions |
+| Broker / Sales Desk | FX Blotter | Monitors live positions, settlement, counterparty exposure |
+| Operations Staff | Admin | Investigates trades, manages EOD, triages exceptions |
+| Risk Manager | Admin | Monitors risk aggregations, approves limit exceptions |
+| Platform Administrator | Admin + Grafana | Manages infrastructure, scaling, cost |
+| Rules Owner / Quant | Admin | Deploys rules, reviews impact, simulates changes |
+| Compliance Officer | Admin | Verifies reporting completeness, audit trail |
+| SRE / Dev Team | Grafana + Kibana + Jaeger | Traces, metrics, logs, deployment correlation |
+
+### Use Cases by Category
+
+| Category | Count | Key Agents Involved |
+|---|---|---|
+| **Trade Lifecycle & Investigation** | 10 | Supervisor, Trade Lifecycle Reconstruction, State Divergence, Event Integrity, Duplicate Effect Guard, Amendment Ripple |
+| **Risk & Rules** | 8 | Risk Explainability, Rule Impact, Rule Coverage, Shadow Rule Simulator, Counterparty Exposure |
+| **End-of-Day Operations** | 7 | EOD Readiness, Exception Materiality, Data Freshness, Business Calendar |
+| **Event & Data Integrity** | 8 | DLQ Triage, Consumer Lag Predictor, Market Data Staleness, Schema Drift, Cutoff Calendar, Event Integrity |
+| **Observability & Correlation** | 7 | Business KPI Guard, Change Correlation, Trace Latency, Canary Probe, Runtime Intent, Service Genome, Contagion Analysis |
+| **Capacity, Cost & Recovery** | 7 | Capacity Backlog, Retry Storm, FinOps Cost, Adaptive Routing, Transaction Recovery, Duplicate Effect Guard, Settlement Fail Predictor |
+| **Multi-Agent & Supervisor** | 3 | Supervisor (routes to all others based on intent) |
+| **Total** | **50** | **34 agents** |
+
+> Full use case details with step-by-step portal interactions, agent invocation order, HITL gates, and outcomes: **[docs/use-cases.md](docs/use-cases.md)**
+
+---
+
 ## Quick Start
 
 ```bash
