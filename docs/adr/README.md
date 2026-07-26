@@ -73,3 +73,10 @@ Each ADR follows the structure:
 1. Copy the template format from an existing ADR
 2. Use the next sequential number (e.g., `0002-*.md`)
 3. Submit via PR for team review
+
+| [0030](0030-vector-db-schema-index-management.md) | Vector DB Schema and Index Management |
+| [0031](0031-vector-db-embedding-lifecycle.md) | Embedding Lifecycle — Generation, Storage, Invalidation |
+| [0032](0032-agent-evaluation-strategy.md) | Agent Evaluation Strategy (Evals) |
+| [0033](0033-agentic-framework-choice.md) | Agentic AI Framework — n8n vs LangChain vs CrewAI |
+| [0034](0034-agentic-cloud-vs-local-deployment.md) | Agent Deployment — Local-First vs Cloud-Native |
+| [0035](0035-agentic-memory-architecture.md) | Agent Memory Architecture — Session, Episodic, Semantic |
