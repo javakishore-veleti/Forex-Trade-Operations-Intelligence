@@ -1,0 +1,118 @@
+<section aria-label="Counterparty Exposure" class="counterparty-exposure">
+  <h2>Counterparty Exposure</h2>
+
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading counterparty data...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry loading data">Retry</button>
+    </div>
+  }
+
+  @if (!loading && !error) {
+    @if (lastUpdated) {
+      <p class="freshness" aria-label="Data freshness">Last updated: {{ lastUpdated }}</p>
+    }
+
+    <table class="data-table" aria-label="Counterparty exposure summary">
+      <thead>
+        <tr>
+          <th scope="col"></th>
+          <th scope="col">Counterparty</th>
+          <th scope="col">Risk Amount</th>
+          <th scope="col">Limit</th>
+          <th scope="col">Utilization</th>
+          <th scope="col">Risk Level</th>
+          <th scope="col">Trades</th>
+          <th scope="col">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (cp of counterparties; track cp.counterpartyId) {
+          <tr [class.warning-row]="isWarning(cp)" [class.breach-row]="isBreach(cp)">
+            <td>
+              <button (click)="toggleExpand(cp.counterpartyId)" class="expand-btn"
+                      [attr.aria-expanded]="expandedCounterparty === cp.counterpartyId"
+                      [attr.aria-label]="'Expand trades for ' + cp.counterpartyName">
+                {{ expandedCounterparty === cp.counterpartyId ? '▼' : '▶' }}
+              </button>
+            </td>
+            <td>
+              <strong>{{ cp.counterpartyName }}</strong>
+              <br><small>{{ cp.counterpartyId }}</small>
+            </td>
+            <td>{{ cp.aggregateRiskAmount | number }} {{ cp.riskCurrency }}</td>
+            <td>{{ cp.limit | number }} {{ cp.riskCurrency }}</td>
+            <td>
+              <span [class.warning-value]="isWarning(cp)" [class.breach-value]="isBreach(cp)">
+                {{ cp.utilizationPercent | number:'1.1-1' }}%
+              </span>
+            </td>
+            <td>
+              <span class="risk-level" [attr.data-level]="cp.riskLevel"
+                    [attr.aria-label]="'Risk level: ' + cp.riskLevel">
+                <span aria-hidden="true">{{ cp.riskLevel === 'HIGH' || cp.riskLevel === 'CRITICAL' ? '⚠' : '●' }}</span>
+                {{ cp.riskLevel }}
+              </span>
+            </td>
+            <td>{{ cp.tradeCount }}</td>
+            <td>
+              @if (isBreach(cp)) {
+                <span class="breach-indicator" aria-label="Limit breached - utilization over 100%">
+                  <span aria-hidden="true">⚠</span> BREACH
+                </span>
+              } @else if (isWarning(cp)) {
+                <span class="warning-indicator" aria-label="Approaching limit - utilization over 80%">
+                  <span aria-hidden="true">●</span> WARNING
+                </span>
+              } @else {
+                <span class="ok-indicator" aria-label="Within safe limits">OK</span>
+              }
+            </td>
+          </tr>
+
+          <!-- Expanded Trades -->
+          @if (expandedCounterparty === cp.counterpartyId) {
+            <tr class="expanded-row">
+              <td colspan="8">
+                @if (expandLoading) {
+                  <div class="loading-inline" role="status" aria-live="polite">Loading trades...</div>
+                } @else if (expandedTrades.length === 0) {
+                  <p class="no-trades">No trades found for this counterparty.</p>
+                } @else {
+                  <table class="inner-table" aria-label="Contributing trades for {{ cp.counterpartyName }}">
+                    <thead>
+                      <tr>
+                        <th scope="col">Trade ID</th>
+                        <th scope="col">Pair</th>
+                        <th scope="col">Notional</th>
+                        <th scope="col">Direction</th>
+                        <th scope="col">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (trade of expandedTrades; track trade.tradeId) {
+                        <tr>
+                          <td>{{ trade.tradeId }}</td>
+                          <td>{{ trade.currencyPair }}</td>
+                          <td>{{ trade.notionalAmount | number }}</td>
+                          <td>{{ trade.direction }}</td>
+                          <td>{{ trade.status }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                }
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  }
+</section>

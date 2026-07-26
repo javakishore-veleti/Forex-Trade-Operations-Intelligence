@@ -1,0 +1,110 @@
+<section aria-label="Exposure View" class="exposure-view">
+  <h2>Exposure View</h2>
+
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading exposure data...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry loading exposure data">Retry</button>
+    </div>
+  }
+
+  @if (!loading && !error) {
+    @if (lastUpdated) {
+      <p class="freshness" aria-label="Data freshness">
+        Last updated: {{ lastUpdated }}
+      </p>
+    }
+
+    <!-- By Currency Pair -->
+    <section aria-label="Exposure by currency pair">
+      <h3>By Currency Pair</h3>
+      <table class="data-table" aria-label="Exposure breakdown by currency pair">
+        <thead>
+          <tr>
+            <th scope="col">Currency Pair</th>
+            <th scope="col">Risk Amount</th>
+            <th scope="col">Limit</th>
+            <th scope="col">Utilization</th>
+            <th scope="col">Risk Level</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (group of exposureByPair; track group.groupKey) {
+            <tr [class.breach-row]="isBreach(group)">
+              <td>{{ group.groupKey }}</td>
+              <td>{{ group.totalRiskAmount | number }} {{ group.riskCurrency }}</td>
+              <td>{{ group.limit ? (group.limit | number) + ' ' + group.riskCurrency : 'N/A' }}</td>
+              <td>{{ group.utilizationPercent != null ? (group.utilizationPercent | number:'1.1-1') + '%' : 'N/A' }}</td>
+              <td>
+                <span class="risk-level" [attr.data-level]="group.riskLevel"
+                      [attr.aria-label]="'Risk level: ' + group.riskLevel">
+                  <span aria-hidden="true">{{ group.riskLevel === 'HIGH' || group.riskLevel === 'CRITICAL' ? '⚠' : '●' }}</span>
+                  {{ group.riskLevel }}
+                </span>
+              </td>
+              <td>
+                @if (isBreach(group)) {
+                  <span class="breach-indicator" aria-label="Limit breached">
+                    <span aria-hidden="true">⚠</span> BREACH
+                  </span>
+                } @else {
+                  <span class="ok-indicator" aria-label="Within limits">OK</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <!-- By Region -->
+    <section aria-label="Exposure by region">
+      <h3>By Region</h3>
+      <table class="data-table" aria-label="Exposure breakdown by region">
+        <thead>
+          <tr>
+            <th scope="col">Region</th>
+            <th scope="col">Risk Amount</th>
+            <th scope="col">Limit</th>
+            <th scope="col">Utilization</th>
+            <th scope="col">Risk Level</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (group of exposureByRegion; track group.groupKey) {
+            <tr [class.breach-row]="isBreach(group)">
+              <td>{{ group.groupKey }}</td>
+              <td>{{ group.totalRiskAmount | number }} {{ group.riskCurrency }}</td>
+              <td>{{ group.limit ? (group.limit | number) + ' ' + group.riskCurrency : 'N/A' }}</td>
+              <td>{{ group.utilizationPercent != null ? (group.utilizationPercent | number:'1.1-1') + '%' : 'N/A' }}</td>
+              <td>
+                <span class="risk-level" [attr.data-level]="group.riskLevel"
+                      [attr.aria-label]="'Risk level: ' + group.riskLevel">
+                  <span aria-hidden="true">{{ group.riskLevel === 'HIGH' || group.riskLevel === 'CRITICAL' ? '⚠' : '●' }}</span>
+                  {{ group.riskLevel }}
+                </span>
+              </td>
+              <td>
+                @if (isBreach(group)) {
+                  <span class="breach-indicator" aria-label="Limit breached">
+                    <span aria-hidden="true">⚠</span> BREACH
+                  </span>
+                } @else {
+                  <span class="ok-indicator" aria-label="Within limits">OK</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  }
+</section>

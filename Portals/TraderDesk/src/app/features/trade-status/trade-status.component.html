@@ -1,0 +1,83 @@
+<section aria-label="Trade Status" class="trade-status">
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading trade status...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry loading trade">Retry</button>
+    </div>
+  }
+
+  @if (trade && !loading) {
+    <header class="trade-header">
+      <h2>Trade: {{ trade.tradeId }}</h2>
+      @if (isFailed()) {
+        <span class="status-indicator failed" aria-label="Trade status: Failed">
+          <span aria-hidden="true">✗</span> FAILED
+        </span>
+      }
+    </header>
+
+    <!-- Step Indicator -->
+    <nav class="step-indicator" aria-label="Trade lifecycle progress">
+      <ol class="steps">
+        @for (stage of stages; track stage) {
+          <li class="step" [attr.data-state]="getStageState(stage)"
+              [attr.aria-label]="stage + ': ' + getStageState(stage)"
+              [attr.aria-current]="getStageState(stage) === 'current' ? 'step' : null">
+            <span class="step-marker" aria-hidden="true">
+              @if (getStageState(stage) === 'complete') { ✓ }
+              @else if (getStageState(stage) === 'current') { ● }
+              @else { ○ }
+            </span>
+            <span class="step-label">{{ stage.replace('TRADE_', '').replace('RISK_', '') }}</span>
+          </li>
+        }
+      </ol>
+    </nav>
+
+    <!-- Trade Details -->
+    <div class="trade-details" aria-label="Trade details">
+      <dl class="detail-grid">
+        <dt>Trade ID</dt><dd>{{ trade.tradeId }}</dd>
+        <dt>Currency Pair</dt><dd>{{ trade.currencyPair }}</dd>
+        <dt>Notional Amount</dt><dd>{{ trade.notionalAmount | number }}</dd>
+        <dt>Direction</dt><dd>{{ trade.direction }}</dd>
+        <dt>Trade Date</dt><dd>{{ trade.tradeDate }}</dd>
+        <dt>Value Date</dt><dd>{{ trade.valueDate }}</dd>
+        <dt>Region</dt><dd>{{ trade.regionCode }}</dd>
+        <dt>Trading Book</dt><dd>{{ trade.tradingBookId }}</dd>
+        <dt>Status</dt><dd>{{ trade.status }}</dd>
+      </dl>
+    </div>
+
+    @if (hasRiskResult()) {
+      <div class="risk-link">
+        <a [routerLink]="['/risk', trade.tradeId]" aria-label="View risk explanation for this trade">
+          View Risk Explanation →
+        </a>
+      </div>
+    }
+
+    <!-- Lifecycle Timeline -->
+    <section aria-label="Lifecycle event timeline" class="timeline-section">
+      <h3>Event Timeline</h3>
+      <ol class="timeline" role="list">
+        @for (event of lifecycleEvents; track event.eventId) {
+          <li class="timeline-event">
+            <span class="timeline-marker" aria-hidden="true"></span>
+            <div class="timeline-content">
+              <strong>{{ event.eventType }}</strong>
+              <time [attr.datetime]="event.timestamp">{{ event.timestamp }}</time>
+              <span class="event-status">{{ event.status }}</span>
+            </div>
+          </li>
+        }
+      </ol>
+    </section>
+  }
+</section>

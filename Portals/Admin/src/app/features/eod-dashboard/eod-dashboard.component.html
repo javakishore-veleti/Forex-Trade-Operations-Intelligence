@@ -1,0 +1,79 @@
+<section aria-label="EOD Status Dashboard" class="eod-dashboard">
+  <h2>End-of-Day Status Dashboard</h2>
+
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading EOD status...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry loading EOD status">
+        Retry
+      </button>
+    </div>
+  }
+
+  @if (eodStatus && !loading) {
+    <div class="global-info">
+      <dl class="info-grid">
+        <dt>Global Business Date</dt>
+        <dd>{{ eodStatus.globalBusinessDate }}</dd>
+        <dt>Global Consolidation</dt>
+        <dd>
+          <span class="state-indicator" [attr.data-state]="eodStatus.globalConsolidationStatus">
+            <span class="state-icon" aria-hidden="true">{{ getStateIcon(eodStatus.globalConsolidationStatus) }}</span>
+            {{ eodStatus.globalConsolidationStatus }}
+          </span>
+        </dd>
+      </dl>
+    </div>
+
+    <div class="regions-grid" role="list" aria-label="Regional close status">
+      @for (region of eodStatus.regions; track region.regionCode) {
+        <article
+          class="region-card"
+          [attr.data-state]="region.state"
+          role="listitem"
+          [attr.aria-label]="region.regionCode + ' region status: ' + region.state">
+          <header class="region-header">
+            <h3>{{ region.regionCode }}</h3>
+            <span class="state-indicator" [attr.data-state]="region.state">
+              <span class="state-icon" aria-hidden="true">{{ getStateIcon(region.state) }}</span>
+              {{ region.state }}
+            </span>
+          </header>
+
+          <div class="region-details">
+            <p class="elapsed-time">
+              <span class="label">Elapsed:</span>
+              {{ getElapsedTime(region.startedAt) }}
+            </p>
+
+            @if (region.state === 'BLOCKED') {
+              <div class="blocker-info" role="alert">
+                <p class="blocker-code">
+                  <span class="label">Blocker:</span> {{ region.blockerCode }}
+                </p>
+                <p class="blocker-desc">{{ region.blockerDescription }}</p>
+                <a
+                  [routerLink]="['/exceptions']"
+                  [queryParams]="{ region: region.regionCode }"
+                  class="blocker-link"
+                  [attr.aria-label]="'View exceptions for ' + region.regionCode">
+                  View Exceptions →
+                </a>
+              </div>
+            }
+          </div>
+        </article>
+      }
+    </div>
+
+    <p class="polling-info" aria-live="polite">
+      Auto-refreshing every {{ config.eodDashboardIntervalMs / 1000 }}s
+    </p>
+  }
+</section>

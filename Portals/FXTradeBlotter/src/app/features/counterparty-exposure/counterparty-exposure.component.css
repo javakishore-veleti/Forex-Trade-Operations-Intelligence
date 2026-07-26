@@ -1,0 +1,162 @@
+:host {
+  display: block;
+  padding: 1.5rem;
+}
+
+.freshness {
+  color: #666;
+  font-size: 0.85rem;
+  font-style: italic;
+  margin-bottom: 1rem;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.data-table th {
+  font-weight: 600;
+  background: #f5f5f5;
+}
+
+.warning-row {
+  background: #fff3e0;
+}
+
+.breach-row {
+  background: #ffebee;
+}
+
+.warning-value {
+  color: #e65100;
+  font-weight: 700;
+}
+
+.breach-value {
+  color: #d32f2f;
+  font-weight: 700;
+}
+
+.breach-indicator {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  background: #d32f2f;
+  color: #fff;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.warning-indicator {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  background: #f57c00;
+  color: #fff;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ok-indicator {
+  color: #388e3c;
+  font-weight: 600;
+}
+
+.risk-level[data-level="HIGH"],
+.risk-level[data-level="CRITICAL"] {
+  color: #d32f2f;
+  font-weight: 700;
+}
+
+.risk-level[data-level="MEDIUM"] {
+  color: #f57c00;
+  font-weight: 600;
+}
+
+.risk-level[data-level="LOW"] {
+  color: #388e3c;
+}
+
+.expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.expanded-row {
+  background: #fafafa;
+}
+
+.inner-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+}
+
+.inner-table th,
+.inner-table td {
+  padding: 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+  font-size: 0.85rem;
+}
+
+.inner-table th {
+  background: #eeeeee;
+  font-weight: 600;
+}
+
+.loading-inline {
+  padding: 0.5rem;
+  color: #555;
+  font-style: italic;
+}
+
+.no-trades {
+  padding: 0.5rem;
+  color: #666;
+}
+
+.error-panel {
+  padding: 1rem;
+  border: 2px solid #d32f2f;
+  border-radius: 4px;
+  background: #ffebee;
+}
+
+.error-message {
+  color: #d32f2f;
+  margin-bottom: 0.5rem;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-retry {
+  background: #f57c00;
+  color: #fff;
+}
+
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #555;
+}

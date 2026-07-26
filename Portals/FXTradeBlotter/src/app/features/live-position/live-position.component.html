@@ -1,0 +1,63 @@
+<section aria-label="Live Position View" class="live-position">
+  <h2>Live Positions</h2>
+
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading positions...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry loading positions">Retry</button>
+    </div>
+  }
+
+  @if (!loading && !error) {
+    <table class="data-table" aria-label="Live positions by currency pair">
+      <thead>
+        <tr>
+          <th scope="col">Currency Pair</th>
+          <th scope="col">Net Long</th>
+          <th scope="col">Net Short</th>
+          <th scope="col">Net Position</th>
+          <th scope="col">Trade Count</th>
+          <th scope="col">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (pos of positions; track pos.currencyPair) {
+          <tr [class.threshold-exceeded]="exceedsThreshold(pos)">
+            <td>
+              <a [routerLink]="['/settlement']"
+                 [queryParams]="{ currencyPair: pos.currencyPair }"
+                 [attr.aria-label]="'View settlement for ' + pos.currencyPair">
+                {{ pos.currencyPair }}
+              </a>
+            </td>
+            <td>{{ pos.netLongNotional | number }} {{ pos.currency }}</td>
+            <td>{{ pos.netShortNotional | number }} {{ pos.currency }}</td>
+            <td [class.positive]="pos.netPosition > 0" [class.negative]="pos.netPosition < 0">
+              {{ pos.netPosition | number }} {{ pos.currency }}
+            </td>
+            <td>{{ pos.tradeCount }}</td>
+            <td>
+              @if (exceedsThreshold(pos)) {
+                <span class="threshold-badge" aria-label="Position exceeds display threshold">
+                  <span aria-hidden="true">⚠</span> LARGE POSITION
+                </span>
+              } @else {
+                <span class="normal-badge" aria-label="Position within normal range">Normal</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <p class="polling-info" aria-live="polite">
+      Auto-refreshing every {{ config.livePositionIntervalMs / 1000 }}s
+    </p>
+  }
+</section>

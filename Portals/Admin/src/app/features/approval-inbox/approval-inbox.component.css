@@ -1,0 +1,176 @@
+:host {
+  display: block;
+  padding: 1.5rem;
+}
+
+.approval-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.approval-card {
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.approval-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.approval-header h3 {
+  margin: 0;
+}
+
+.risk-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.risk-badge[data-risk="H"] {
+  background: #ffebee;
+  color: #d32f2f;
+  border: 1px solid #d32f2f;
+}
+
+.risk-badge[data-risk="M"] {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #e65100;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1.5rem;
+}
+
+.detail-grid dt {
+  font-weight: 600;
+  color: #555;
+}
+
+.detail-grid dd {
+  margin: 0;
+}
+
+.approval-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-approve {
+  background: #388e3c;
+  color: #fff;
+}
+
+.btn-reject {
+  background: #d32f2f;
+  color: #fff;
+}
+
+.btn-cancel {
+  background: #757575;
+  color: #fff;
+}
+
+.btn-retry {
+  background: #f57c00;
+  color: #fff;
+}
+
+.confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.confirm-dialog {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.note-field {
+  margin-top: 1rem;
+}
+
+.note-field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.note-field textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.error-panel {
+  padding: 1rem;
+  border: 2px solid #d32f2f;
+  border-radius: 4px;
+  background: #ffebee;
+}
+
+.error-message {
+  color: #d32f2f;
+  margin-bottom: 0.5rem;
+}
+
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #555;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+}
+
+.polling-info {
+  color: #666;
+  font-size: 0.8rem;
+  font-style: italic;
+  margin-top: 1rem;
+}

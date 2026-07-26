@@ -1,0 +1,133 @@
+<section aria-label="Exception Queue" class="exception-queue">
+  <h2>Exception Queue</h2>
+
+  <!-- Filters -->
+  <form (ngSubmit)="applyFilters()" class="filter-form" role="search" aria-label="Filter exceptions">
+    <div class="filter-grid">
+      <div class="filter-field">
+        <label for="filterType">Type</label>
+        <select id="filterType" [(ngModel)]="filterType" name="filterType" aria-label="Filter by exception type">
+          <option value="">All Types</option>
+          <option value="LATE_TRADE">Late Trade</option>
+          <option value="BRANCH_BLOCKER">Branch Blocker</option>
+          <option value="DLQ_MESSAGE">DLQ Message</option>
+          <option value="POISON_MESSAGE">Poison Message</option>
+          <option value="SEQUENCE_VIOLATION">Sequence Violation</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="filterRegion">Region</label>
+        <select id="filterRegion" [(ngModel)]="filterRegion" name="filterRegion" aria-label="Filter by region">
+          <option value="">All Regions</option>
+          <option value="APAC">APAC</option>
+          <option value="EMEA">EMEA</option>
+          <option value="AMERICAS">AMERICAS</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="filterTradeId">Trade ID</label>
+        <input id="filterTradeId" type="text" [(ngModel)]="filterTradeId" name="filterTradeId"
+               placeholder="e.g. FX-000001" aria-label="Filter by trade ID" />
+      </div>
+      <div class="filter-field">
+        <label for="filterFromDate">From Date</label>
+        <input id="filterFromDate" type="date" [(ngModel)]="filterFromDate" name="filterFromDate"
+               aria-label="Filter from date" />
+      </div>
+      <div class="filter-field">
+        <label for="filterToDate">To Date</label>
+        <input id="filterToDate" type="date" [(ngModel)]="filterToDate" name="filterToDate"
+               aria-label="Filter to date" />
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary" aria-label="Apply filters">Apply</button>
+      <button type="button" (click)="clearFilters()" class="btn btn-secondary" aria-label="Clear all filters">Clear</button>
+    </div>
+  </form>
+
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading exceptions...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry loading exceptions">Retry</button>
+    </div>
+  }
+
+  @if (!loading && !error) {
+    @if (exceptions.length === 0) {
+      <div class="empty-state" aria-live="polite">
+        <p>No unresolved exceptions found matching the current filters.</p>
+      </div>
+    } @else {
+      <table class="data-table" aria-label="Exception queue entries">
+        <thead>
+          <tr>
+            <th scope="col">Type</th>
+            <th scope="col">Trade ID</th>
+            <th scope="col">Region</th>
+            <th scope="col">Created</th>
+            <th scope="col">Status</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (exc of exceptions; track exc.exceptionId) {
+            <tr [class.poison-row]="exc.isPoisonMessage">
+              <td>
+                {{ exc.type }}
+                @if (exc.isPoisonMessage) {
+                  <span class="poison-badge" aria-label="Poison message - requires manual review">
+                    <span aria-hidden="true">☠</span> Requires Manual Review
+                  </span>
+                }
+              </td>
+              <td>{{ exc.tradeId || '—' }}</td>
+              <td>{{ exc.regionCode }}</td>
+              <td>{{ exc.createdAt }}</td>
+              <td>
+                <span class="status-badge" [attr.data-status]="exc.status">{{ exc.status }}</span>
+              </td>
+              <td>
+                @if (exc.isPoisonMessage) {
+                  <span class="manual-review-label" aria-label="No automatic action available">
+                    Manual Review Only
+                  </span>
+                } @else if (exc.permittedActions.length > 0) {
+                  @for (action of exc.permittedActions; track action) {
+                    <button
+                      (click)="confirmResolve(exc.exceptionId, action)"
+                      class="btn btn-action"
+                      [attr.aria-label]="'Execute ' + action + ' for exception ' + exc.exceptionId">
+                      {{ action }}
+                    </button>
+                  }
+                } @else {
+                  <span class="no-action">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  }
+
+  <!-- Confirmation Dialog -->
+  @if (confirmingAction) {
+    <div class="confirm-overlay" role="dialog" aria-modal="true" aria-label="Confirm action">
+      <div class="confirm-dialog">
+        <p>Are you sure you want to execute <strong>{{ confirmingAction.action }}</strong>?</p>
+        <div class="confirm-actions">
+          <button (click)="executeResolve()" class="btn btn-confirm" aria-label="Confirm action">Confirm</button>
+          <button (click)="cancelResolve()" class="btn btn-cancel" aria-label="Cancel action">Cancel</button>
+        </div>
+      </div>
+    </div>
+  }
+</section>

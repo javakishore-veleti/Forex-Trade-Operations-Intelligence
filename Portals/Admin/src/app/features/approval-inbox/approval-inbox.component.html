@@ -1,0 +1,110 @@
+<section aria-label="Agent Approval Inbox" class="approval-inbox">
+  <h2>Agent Approval Requests</h2>
+
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading pending approvals...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry loading approvals">Retry</button>
+    </div>
+  }
+
+  @if (!loading && !error) {
+    @if (approvals.length === 0) {
+      <div class="empty-state" aria-live="polite">
+        <p>No pending approval requests.</p>
+      </div>
+    } @else {
+      <div class="approval-list" role="list" aria-label="Pending approval requests">
+        @for (approval of approvals; track approval.approvalReference) {
+          <article class="approval-card" role="listitem"
+                   [attr.aria-label]="'Approval request from ' + approval.agentName">
+            <header class="approval-header">
+              <h3>{{ approval.agentName }}</h3>
+              <span class="risk-badge" [attr.data-risk]="approval.riskClassification"
+                    [attr.aria-label]="'Risk classification: ' + (approval.riskClassification === 'H' ? 'High' : 'Medium')">
+                <span aria-hidden="true">{{ approval.riskClassification === 'H' ? '⚠' : '●' }}</span>
+                {{ approval.riskClassification === 'H' ? 'HIGH' : 'MEDIUM' }}
+              </span>
+            </header>
+
+            <div class="approval-body">
+              <dl class="detail-grid">
+                <dt>Proposed Action</dt>
+                <dd>{{ approval.proposedAction }}</dd>
+                <dt>Impact Report</dt>
+                <dd>{{ approval.impactReport }}</dd>
+                <dt>Reference</dt>
+                <dd><code>{{ approval.approvalReference }}</code></dd>
+                <dt>Requested At</dt>
+                <dd>{{ approval.createdAt }}</dd>
+              </dl>
+            </div>
+
+            <footer class="approval-actions">
+              <button
+                (click)="confirmApprove(approval)"
+                class="btn btn-approve"
+                [attr.aria-label]="'Approve request from ' + approval.agentName">
+                Approve
+              </button>
+              <button
+                (click)="confirmReject(approval)"
+                class="btn btn-reject"
+                [attr.aria-label]="'Reject request from ' + approval.agentName">
+                Reject
+              </button>
+            </footer>
+          </article>
+        }
+      </div>
+    }
+
+    <p class="polling-info" aria-live="polite">
+      Auto-refreshing every {{ config.approvalInboxIntervalMs / 1000 }}s
+    </p>
+  }
+
+  <!-- Confirmation Dialog -->
+  @if (confirmingDecision) {
+    <div class="confirm-overlay" role="dialog" aria-modal="true"
+         [attr.aria-label]="'Confirm ' + confirmingDecision.decision.toLowerCase()">
+      <div class="confirm-dialog">
+        <h3>Confirm {{ confirmingDecision.decision === 'APPROVED' ? 'Approval' : 'Rejection' }}</h3>
+        <p>
+          You are about to <strong>{{ confirmingDecision.decision === 'APPROVED' ? 'approve' : 'reject' }}</strong>
+          the request from <strong>{{ confirmingDecision.approval.agentName }}</strong>.
+        </p>
+        <p><em>Action: {{ confirmingDecision.approval.proposedAction }}</em></p>
+
+        <div class="note-field">
+          <label for="operatorNote">Operator Note (optional)</label>
+          <textarea
+            id="operatorNote"
+            [(ngModel)]="operatorNote"
+            rows="3"
+            placeholder="Add a note..."
+            aria-label="Operator note for this decision">
+          </textarea>
+        </div>
+
+        <div class="confirm-actions">
+          <button (click)="submitDecision()" class="btn"
+                  [class.btn-approve]="confirmingDecision.decision === 'APPROVED'"
+                  [class.btn-reject]="confirmingDecision.decision === 'REJECTED'"
+                  aria-label="Confirm decision">
+            Confirm {{ confirmingDecision.decision === 'APPROVED' ? 'Approval' : 'Rejection' }}
+          </button>
+          <button (click)="cancelDecision()" class="btn btn-cancel" aria-label="Cancel decision">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</section>

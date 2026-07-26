@@ -1,0 +1,132 @@
+<section aria-label="Trading Book View" class="trading-book">
+  <h2>Trading Book</h2>
+
+  <!-- Book Search -->
+  <form (ngSubmit)="searchBook()" class="search-form" role="search" aria-label="Search for a trading book">
+    <div class="search-input-group">
+      <label for="bookId" class="sr-only">Trading Book ID</label>
+      <input id="bookId" type="text" [(ngModel)]="bookId" name="bookId"
+             placeholder="Enter Trading Book ID (e.g. FX-BOOK-001)"
+             class="search-input" aria-label="Trading book identifier" />
+      <button type="submit" class="btn btn-primary" [disabled]="!bookId.trim()" aria-label="Load trading book">
+        Load Book
+      </button>
+    </div>
+  </form>
+
+  <!-- Filters -->
+  @if (trades.length > 0 || statusFilter || riskLevelFilter) {
+    <div class="filters" aria-label="Filter controls">
+      <div class="filter-group">
+        <label for="statusFilter">Status:</label>
+        <select id="statusFilter" [(ngModel)]="statusFilter" (change)="applyFilters()" aria-label="Filter by status">
+          <option value="">All</option>
+          <option value="TRADE_RECEIVED">Received</option>
+          <option value="TRADE_VALIDATED">Validated</option>
+          <option value="TRADE_ENRICHED">Enriched</option>
+          <option value="RISK_CALCULATED">Risk Calculated</option>
+          <option value="TRADE_CONFIRMED">Confirmed</option>
+          <option value="TRADE_SETTLED">Settled</option>
+          <option value="TRADE_FAILED">Failed</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="riskFilter">Risk Level:</label>
+        <select id="riskFilter" [(ngModel)]="riskLevelFilter" (change)="applyFilters()" aria-label="Filter by risk level">
+          <option value="">All</option>
+          <option value="LOW">Low</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HIGH">High</option>
+          <option value="CRITICAL">Critical</option>
+        </select>
+      </div>
+    </div>
+  }
+
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading trades...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry loading trades">Retry</button>
+    </div>
+  }
+
+  @if (!loading && !error && trades.length > 0) {
+    <p class="result-count" aria-live="polite">{{ totalElements }} trades in book {{ bookId }}</p>
+
+    <table class="data-table" aria-label="Trades in trading book">
+      <thead>
+        <tr>
+          <th scope="col">Trade ID</th>
+          <th scope="col">
+            <button (click)="sort('tradeDate')" class="sort-btn" aria-label="Sort by trade date">
+              Trade Date {{ sortBy === 'tradeDate' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </button>
+          </th>
+          <th scope="col">Currency Pair</th>
+          <th scope="col">
+            <button (click)="sort('notionalAmount')" class="sort-btn" aria-label="Sort by notional amount">
+              Notional {{ sortBy === 'notionalAmount' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </button>
+          </th>
+          <th scope="col">Direction</th>
+          <th scope="col">Status</th>
+          <th scope="col">
+            <button (click)="sort('riskLevel')" class="sort-btn" aria-label="Sort by risk level">
+              Risk Level {{ sortBy === 'riskLevel' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </button>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (trade of trades; track trade.tradeId) {
+          <tr>
+            <td>
+              <a [routerLink]="['/trades', trade.tradeId]" [attr.aria-label]="'View trade ' + trade.tradeId">
+                {{ trade.tradeId }}
+              </a>
+            </td>
+            <td>{{ trade.tradeDate }}</td>
+            <td>{{ trade.currencyPair }}</td>
+            <td>{{ trade.notionalAmount | number }}</td>
+            <td>{{ trade.direction }}</td>
+            <td>{{ trade.status }}</td>
+            <td>
+              <span class="risk-level" [attr.data-level]="trade.riskLevel"
+                    [attr.aria-label]="'Risk level: ' + trade.riskLevel">
+                <span aria-hidden="true">{{ trade.riskLevel === 'HIGH' || trade.riskLevel === 'CRITICAL' ? '⚠' : '●' }}</span>
+                {{ trade.riskLevel }}
+              </span>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <!-- Pagination -->
+    <nav class="pagination" aria-label="Trade list pagination">
+      <button (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 0"
+              class="btn btn-page" aria-label="Previous page">
+        ← Previous
+      </button>
+      <span class="page-info" aria-live="polite">
+        Page {{ currentPage + 1 }} of {{ totalPages }}
+      </span>
+      <button (click)="goToPage(currentPage + 1)" [disabled]="currentPage >= totalPages - 1"
+              class="btn btn-page" aria-label="Next page">
+        Next →
+      </button>
+    </nav>
+  }
+
+  @if (!loading && !error && trades.length === 0 && bookId) {
+    <div class="empty-state" aria-live="polite">
+      <p>No trades found in this trading book.</p>
+    </div>
+  }
+</section>

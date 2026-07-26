@@ -1,0 +1,117 @@
+<section aria-label="Settlement Status" class="settlement-status">
+  <h2>Settlement Status</h2>
+
+  <!-- Filters -->
+  <form (ngSubmit)="applyFilters()" class="filter-form" aria-label="Filter settlement trades">
+    <div class="filter-grid">
+      <div class="filter-field">
+        <label for="filterDate">Value Date</label>
+        <input id="filterDate" type="date" [(ngModel)]="filterValueDate" name="filterValueDate"
+               aria-label="Filter by value date" />
+      </div>
+      <div class="filter-field">
+        <label for="filterStatus">Status</label>
+        <select id="filterStatus" [(ngModel)]="filterStatus" name="filterStatus" aria-label="Filter by trade status">
+          <option value="">All</option>
+          <option value="TRADE_RECEIVED">Received</option>
+          <option value="TRADE_VALIDATED">Validated</option>
+          <option value="TRADE_ENRICHED">Enriched</option>
+          <option value="RISK_CALCULATED">Risk Calculated</option>
+          <option value="TRADE_CONFIRMED">Confirmed</option>
+          <option value="TRADE_SETTLED">Settled</option>
+          <option value="TRADE_FAILED">Failed</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="filterPair">Currency Pair</label>
+        <input id="filterPair" type="text" [(ngModel)]="filterCurrencyPair" name="filterCurrencyPair"
+               placeholder="e.g. EUR/USD" aria-label="Filter by currency pair" />
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary" aria-label="Apply filters">Apply</button>
+      <button type="button" (click)="clearFilters()" class="btn btn-secondary" aria-label="Clear filters">Clear</button>
+    </div>
+  </form>
+
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading settlement trades...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry">Retry</button>
+    </div>
+  }
+
+  @if (!loading && !error) {
+    @if (trades.length === 0) {
+      <div class="empty-state" aria-live="polite">
+        <p>No trades matching the current filters.</p>
+      </div>
+    } @else {
+      <p class="result-count">{{ totalElements }} trades</p>
+
+      <table class="data-table" aria-label="Settlement trades">
+        <thead>
+          <tr>
+            <th scope="col">Trade ID</th>
+            <th scope="col">Currency Pair</th>
+            <th scope="col">Notional</th>
+            <th scope="col">Direction</th>
+            <th scope="col">Counterparty</th>
+            <th scope="col">Value Date</th>
+            <th scope="col">Status</th>
+            <th scope="col">Risk</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (trade of trades; track trade.tradeId) {
+            <tr [class.at-risk]="isAtRisk(trade)">
+              <td>
+                <a [href]="getTraderDeskLink(trade.tradeId)" target="_blank"
+                   [attr.aria-label]="'View trade ' + trade.tradeId + ' in TraderDesk'">
+                  {{ trade.tradeId }}
+                </a>
+              </td>
+              <td>{{ trade.currencyPair }}</td>
+              <td>{{ trade.notionalAmount | number }}</td>
+              <td>{{ trade.direction }}</td>
+              <td>{{ trade.counterpartyId }}</td>
+              <td>{{ trade.valueDate }}</td>
+              <td>{{ trade.status }}</td>
+              <td>
+                @if (isAtRisk(trade)) {
+                  <span class="risk-flag" aria-label="At settlement risk">
+                    <span aria-hidden="true">⚠</span> AT RISK
+                  </span>
+                }
+                @if (trade.hasDlqFlag) {
+                  <span class="dlq-flag" aria-label="Has DLQ entry">DLQ</span>
+                }
+                @if (trade.hasAnomalyFlag) {
+                  <span class="anomaly-flag" aria-label="Has anomaly">ANOMALY</span>
+                }
+                @if (!isAtRisk(trade) && !trade.hasDlqFlag && !trade.hasAnomalyFlag) {
+                  <span class="ok-indicator" aria-label="No risk flags">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      <nav class="pagination" aria-label="Settlement trades pagination">
+        <button (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 0"
+                class="btn btn-page" aria-label="Previous page">← Previous</button>
+        <span class="page-info" aria-live="polite">Page {{ currentPage + 1 }} of {{ totalPages }}</span>
+        <button (click)="goToPage(currentPage + 1)" [disabled]="currentPage >= totalPages - 1"
+                class="btn btn-page" aria-label="Next page">Next →</button>
+      </nav>
+    }
+  }
+</section>

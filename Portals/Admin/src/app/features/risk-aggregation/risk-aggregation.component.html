@@ -1,0 +1,102 @@
+<section aria-label="Risk Aggregation" class="risk-aggregation">
+  <h2>Risk Aggregation</h2>
+
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading risk aggregations...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry loading risk data">Retry</button>
+    </div>
+  }
+
+  @if (!loading && !error) {
+    <!-- By Region -->
+    <section aria-label="Risk by region">
+      <h3>By Region</h3>
+      <table class="data-table" aria-label="Risk aggregation by region">
+        <thead>
+          <tr>
+            <th scope="col">Region</th>
+            <th scope="col">Risk Amount</th>
+            <th scope="col">Limit</th>
+            <th scope="col">Utilization</th>
+            <th scope="col">Risk Level</th>
+            <th scope="col">Last Calculated</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (agg of regionAggregations; track agg.groupKey) {
+            <tr [class.breach-row]="isBreach(agg)">
+              <td>{{ agg.groupKey }}</td>
+              <td>{{ agg.totalRiskAmount | number }} {{ agg.riskCurrency }}</td>
+              <td>{{ agg.limit | number }} {{ agg.riskCurrency }}</td>
+              <td>
+                <span [class.breach-value]="isBreach(agg)">
+                  {{ agg.utilizationPercent | number:'1.1-1' }}%
+                </span>
+                @if (isBreach(agg)) {
+                  <span class="breach-indicator" aria-label="Limit breached">
+                    <span aria-hidden="true">⚠</span> BREACH
+                  </span>
+                }
+              </td>
+              <td>
+                <span class="risk-level" [attr.data-level]="agg.riskLevel" [attr.aria-label]="'Risk level: ' + agg.riskLevel">
+                  {{ agg.riskLevel }}
+                </span>
+              </td>
+              <td>{{ agg.lastCalculatedAt }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <!-- By Trading Book -->
+    <section aria-label="Risk by trading book">
+      <h3>By Trading Book</h3>
+      <table class="data-table" aria-label="Risk aggregation by trading book">
+        <thead>
+          <tr>
+            <th scope="col">Trading Book</th>
+            <th scope="col">Risk Amount</th>
+            <th scope="col">Limit</th>
+            <th scope="col">Utilization</th>
+            <th scope="col">Risk Level</th>
+            <th scope="col">Last Calculated</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (agg of bookAggregations; track agg.groupKey) {
+            <tr [class.breach-row]="isBreach(agg)">
+              <td>{{ agg.groupKey }}</td>
+              <td>{{ agg.totalRiskAmount | number }} {{ agg.riskCurrency }}</td>
+              <td>{{ agg.limit | number }} {{ agg.riskCurrency }}</td>
+              <td>
+                <span [class.breach-value]="isBreach(agg)">
+                  {{ agg.utilizationPercent | number:'1.1-1' }}%
+                </span>
+                @if (isBreach(agg)) {
+                  <span class="breach-indicator" aria-label="Limit breached">
+                    <span aria-hidden="true">⚠</span> BREACH
+                  </span>
+                }
+              </td>
+              <td>
+                <span class="risk-level" [attr.data-level]="agg.riskLevel" [attr.aria-label]="'Risk level: ' + agg.riskLevel">
+                  {{ agg.riskLevel }}
+                </span>
+              </td>
+              <td>{{ agg.lastCalculatedAt }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  }
+</section>

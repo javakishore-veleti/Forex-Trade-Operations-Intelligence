@@ -1,0 +1,113 @@
+<section aria-label="Risk Explanation" class="risk-explanation">
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading risk explanation...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry loading risk explanation">Retry</button>
+    </div>
+  }
+
+  @if (comparison && !loading) {
+    <h2>Risk Explanation: {{ comparison.current.tradeId }}</h2>
+
+    <div class="risk-summary" aria-label="Risk result summary">
+      <dl class="detail-grid">
+        <dt>Risk Amount</dt>
+        <dd>{{ comparison.current.riskAmount | number }} {{ comparison.current.riskCurrency }}</dd>
+        <dt>Risk Level</dt>
+        <dd>
+          <span class="risk-level" [attr.data-level]="comparison.current.riskLevel"
+                [attr.aria-label]="'Risk level: ' + comparison.current.riskLevel">
+            <span aria-hidden="true">⚠</span> {{ comparison.current.riskLevel }}
+          </span>
+        </dd>
+        <dt>Rule Version</dt>
+        <dd>{{ comparison.current.ruleVersion }}</dd>
+        <dt>Calculated At</dt>
+        <dd>{{ comparison.current.calculatedAt }}</dd>
+      </dl>
+    </div>
+
+    <!-- Contributing Factors Breakdown -->
+    <section aria-label="Contributing factors breakdown" class="factors-section">
+      <h3>Contributing Factors</h3>
+      <table class="data-table" aria-label="Risk contributing factors">
+        <thead>
+          <tr>
+            <th scope="col">Factor</th>
+            <th scope="col">Contribution</th>
+            <th scope="col">Share</th>
+            <th scope="col">Visual</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (factor of comparison.current.contributingFactors; track factor.factorName) {
+            <tr>
+              <td>{{ factor.factorName }}</td>
+              <td>{{ factor.contributionAmount | number }} {{ factor.currency }}</td>
+              <td>{{ getFactorPercent(factor.contributionAmount) | number:'1.1-1' }}%</td>
+              <td>
+                <div class="bar-container" role="img"
+                     [attr.aria-label]="factor.factorName + ': ' + getFactorPercent(factor.contributionAmount).toFixed(1) + '%'">
+                  <div class="bar-fill" [style.width.%]="getFactorPercent(factor.contributionAmount)"></div>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Rules Fired -->
+    <section aria-label="Rules fired" class="rules-section">
+      <h3>Rules Applied</h3>
+      <ul class="rules-list" aria-label="List of rules that fired">
+        @for (rule of comparison.current.rulesFired; track rule) {
+          <li><code>{{ rule }}</code></li>
+        }
+      </ul>
+    </section>
+
+    <!-- Prior Comparison -->
+    @if (comparison.prior) {
+      <section aria-label="Comparison with prior calculation" class="comparison-section">
+        <h3>Changes from Prior Calculation</h3>
+        @if (comparison.changedFactors.length === 0) {
+          <p>No factor changes detected from prior calculation.</p>
+        } @else {
+          <table class="data-table" aria-label="Factor changes from prior risk calculation">
+            <thead>
+              <tr>
+                <th scope="col">Factor</th>
+                <th scope="col">Previous</th>
+                <th scope="col">Current</th>
+                <th scope="col">Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (change of comparison.changedFactors; track change.factorName) {
+                <tr [class.increase]="change.changeAmount > 0" [class.decrease]="change.changeAmount < 0">
+                  <td>{{ change.factorName }}</td>
+                  <td>{{ change.previousAmount | number }} {{ change.currency }}</td>
+                  <td>{{ change.currentAmount | number }} {{ change.currency }}</td>
+                  <td>
+                    <span [class.positive-change]="change.changeAmount > 0"
+                          [class.negative-change]="change.changeAmount < 0"
+                          [attr.aria-label]="'Change: ' + (change.changeAmount > 0 ? '+' : '') + change.changeAmount">
+                      {{ change.changeAmount > 0 ? '+' : '' }}{{ change.changeAmount | number }} {{ change.currency }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </section>
+    }
+  }
+</section>

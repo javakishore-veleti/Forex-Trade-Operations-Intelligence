@@ -1,0 +1,173 @@
+<section aria-label="Trade Investigation" class="trade-investigation">
+  @if (loading) {
+    <div class="loading-spinner" role="status" aria-live="polite">
+      <span>Loading trade data...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-panel" role="alert" aria-live="assertive">
+      <p class="error-message">{{ error }}</p>
+      <button (click)="retry()" class="btn btn-retry" aria-label="Retry loading trade data">
+        Retry
+      </button>
+    </div>
+  }
+
+  @if (trade && !loading) {
+    <header class="trade-header">
+      <h2>Trade Investigation: {{ trade.tradeId }}</h2>
+      <span class="status-badge" [attr.data-status]="trade.status" aria-label="Trade status: {{ trade.status }}">
+        {{ trade.status }}
+      </span>
+    </header>
+
+    <div class="trade-details" aria-label="Trade details">
+      <dl class="detail-grid">
+        <dt>Currency Pair</dt><dd>{{ trade.currencyPair }}</dd>
+        <dt>Notional Amount</dt><dd>{{ trade.notionalAmount | number }}</dd>
+        <dt>Direction</dt><dd>{{ trade.direction }}</dd>
+        <dt>Trade Date</dt><dd>{{ trade.tradeDate }}</dd>
+        <dt>Value Date</dt><dd>{{ trade.valueDate }}</dd>
+        <dt>Region</dt><dd>{{ trade.regionCode }}</dd>
+        <dt>Trading Book</dt><dd>{{ trade.tradingBookId }}</dd>
+        <dt>Counterparty</dt><dd>{{ trade.counterpartyId }}</dd>
+      </dl>
+    </div>
+
+    <!-- Lifecycle Timeline -->
+    <section aria-label="Lifecycle timeline" class="timeline-section">
+      <h3>Lifecycle Timeline</h3>
+      <ol class="timeline" role="list">
+        @for (event of lifecycleEvents; track event.eventId) {
+          <li class="timeline-event" [attr.data-status]="event.status">
+            <span class="timeline-marker" aria-hidden="true"></span>
+            <div class="timeline-content">
+              <strong>{{ event.eventType }}</strong>
+              <time [attr.datetime]="event.timestamp">{{ event.timestamp }}</time>
+              <span class="event-status" aria-label="Status: {{ event.status }}">{{ event.status }}</span>
+            </div>
+          </li>
+        }
+      </ol>
+    </section>
+
+    <!-- Risk Result -->
+    @if (riskResult) {
+      <section aria-label="Risk calculation result" class="risk-section">
+        <h3>Risk Result</h3>
+        <dl class="detail-grid">
+          <dt>Risk Amount</dt><dd>{{ riskResult.riskAmount | number }} {{ riskResult.riskCurrency }}</dd>
+          <dt>Risk Level</dt>
+          <dd>
+            <span class="risk-level" [attr.data-level]="riskResult.riskLevel" aria-label="Risk level: {{ riskResult.riskLevel }}">
+              <span class="risk-icon" aria-hidden="true">⚠</span> {{ riskResult.riskLevel }}
+            </span>
+          </dd>
+          <dt>Rule Version</dt><dd>{{ riskResult.ruleVersion }}</dd>
+          <dt>Calculated At</dt><dd>{{ riskResult.calculatedAt }}</dd>
+        </dl>
+      </section>
+    }
+
+    <!-- Sequence Violations -->
+    @if (sequenceViolations.length > 0) {
+      <section aria-label="Sequence anomalies" class="violations-section">
+        <h3>Sequence Anomalies</h3>
+        <table class="data-table" aria-label="Active sequence violations">
+          <thead>
+            <tr>
+              <th scope="col">Expected</th>
+              <th scope="col">Actual</th>
+              <th scope="col">Detected At</th>
+              <th scope="col">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (v of sequenceViolations; track v.detectedAt) {
+              <tr>
+                <td>{{ v.expectedStatus }}</td>
+                <td>{{ v.actualStatus }}</td>
+                <td>{{ v.detectedAt }}</td>
+                <td>{{ v.description }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    }
+
+    <!-- DLQ Entries -->
+    @if (dlqEntries.length > 0) {
+      <section aria-label="Dead letter queue entries" class="dlq-section">
+        <h3>DLQ Entries</h3>
+        <table class="data-table" aria-label="DLQ entries for this trade">
+          <thead>
+            <tr>
+              <th scope="col">Topic</th>
+              <th scope="col">Failure Reason</th>
+              <th scope="col">Retry Count</th>
+              <th scope="col">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of dlqEntries; track d.timestamp) {
+              <tr>
+                <td>{{ d.topic }}</td>
+                <td>{{ d.failureReason }}</td>
+                <td>{{ d.retryCount }}</td>
+                <td>{{ d.timestamp }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    }
+
+    <!-- Reconciliation -->
+    @if (reconciliation) {
+      <section aria-label="Reconciliation status" class="reconciliation-section">
+        <h3>Reconciliation Status</h3>
+        <p><strong>Status:</strong> {{ reconciliation.status }}</p>
+        <p><strong>Reconciled At:</strong> {{ reconciliation.reconciledAt }}</p>
+
+        @if (reconciliation.violatedInvariants.length > 0) {
+          <div class="violated-invariants">
+            <h4>Violated Invariants</h4>
+            <ul aria-label="List of violated invariants">
+              @for (inv of reconciliation.violatedInvariants; track inv) {
+                <li>{{ inv }}</li>
+              }
+            </ul>
+          </div>
+        }
+
+        @if (reconciliation.permittedActions.length > 0) {
+          <div class="permitted-actions">
+            <h4>Available Actions</h4>
+            @for (action of reconciliation.permittedActions; track action) {
+              @if (actionConfirm === action) {
+                <div class="confirm-dialog" role="dialog" aria-label="Confirm action: {{ action }}">
+                  <p>Are you sure you want to execute <strong>{{ action }}</strong>?</p>
+                  <button (click)="executeAction(action)" class="btn btn-confirm" aria-label="Confirm {{ action }}">
+                    Confirm
+                  </button>
+                  <button (click)="cancelAction()" class="btn btn-cancel" aria-label="Cancel {{ action }}">
+                    Cancel
+                  </button>
+                </div>
+              } @else {
+                <button
+                  (click)="confirmAction(action)"
+                  class="btn btn-action"
+                  [attr.aria-label]="'Execute action: ' + action">
+                  {{ action }}
+                </button>
+              }
+            }
+          </div>
+        }
+      </section>
+    }
+  }
+</section>
