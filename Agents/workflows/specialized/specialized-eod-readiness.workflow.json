@@ -1,0 +1,386 @@
+{
+  "name": "Specialized — EOD Readiness",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "eod-readiness",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "eod-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 400],
+      "webhookId": "eod-readiness-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/getRegionalCloseStatus",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: 'APAC' }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "eod-002",
+      "name": "APAC Sub-Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/getRegionalCloseStatus",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: 'EMEA' }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "eod-003",
+      "name": "EMEA Sub-Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/getRegionalCloseStatus",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: 'AMER' }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "eod-004",
+      "name": "AMER Sub-Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 600]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are the global EOD readiness supervisor. Aggregate regional assessments into a unified ReadinessMap. Determine go/no-go. Identify critical path (which blocker resolves first). Consider cross-regional dependencies. Output: ReadinessMap JSON with per-region status, overall recommendation, critical path, required actions.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=EOD Readiness Assessment Request\nRegions: {{ $('Webhook Trigger').item.json.body.regions ? $('Webhook Trigger').item.json.body.regions.join(', ') : 'APAC, EMEA, AMER' }}\n\nAPAC Regional Status:\n{{ JSON.stringify($('APAC Sub-Agent').item.json) }}\n\nEMEA Regional Status:\n{{ JSON.stringify($('EMEA Sub-Agent').item.json) }}\n\nAMER Regional Status:\n{{ JSON.stringify($('AMER Sub-Agent').item.json) }}\n\nAggregate these into a unified ReadinessMap. Determine overall go/no-go. Identify blockers and critical path."
+      },
+      "id": "eod-005",
+      "name": "Global Readiness Synthesizer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [840, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.output }}",
+              "operation": "contains",
+              "value2": "BLOCKED"
+            }
+          ]
+        }
+      },
+      "id": "eod-006",
+      "name": "Blockers Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 400]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "eod-exception-approval",
+          "timeout": "1",
+          "timeoutUnit": "hours"
+        }
+      },
+      "id": "eod-007",
+      "name": "Exception HITL Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1360, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.decision }}",
+              "value2": "APPROVED"
+            }
+          ]
+        }
+      },
+      "id": "eod-008",
+      "name": "Exception Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1620, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "eod-consolidation-approval",
+          "timeout": "2",
+          "timeoutUnit": "hours"
+        }
+      },
+      "id": "eod-009",
+      "name": "Consolidation HITL Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1880, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.decision }}",
+              "value2": "APPROVED"
+            }
+          ]
+        }
+      },
+      "id": "eod-010",
+      "name": "Consolidation Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2140, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/startGlobalConsolidation",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ correlationId: $('Webhook Trigger').item.json.body.correlationId, approvedBy: $json.body.approverUserId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 60000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "eod-011",
+      "name": "Start Consolidation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2400, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "HELD"
+            },
+            {
+              "name": "reason",
+              "value": "Consolidation denied or exception not approved"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "eod-012",
+      "name": "Hold Status",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2400, 540]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: $json.status || 'COMPLETED', agentId: 'eod-readiness', readinessMap: $('Global Readiness Synthesizer').item.json.output, consolidationStarted: $json.consolidationId ? true : false, correlationId: $('Webhook Trigger').item.json.body.correlationId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "eod-013",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2660, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "APAC Sub-Agent", "type": "main", "index": 0 },
+          { "node": "EMEA Sub-Agent", "type": "main", "index": 0 },
+          { "node": "AMER Sub-Agent", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "APAC Sub-Agent": {
+      "main": [
+        [
+          { "node": "Global Readiness Synthesizer", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "EMEA Sub-Agent": {
+      "main": [
+        [
+          { "node": "Global Readiness Synthesizer", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "AMER Sub-Agent": {
+      "main": [
+        [
+          { "node": "Global Readiness Synthesizer", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Global Readiness Synthesizer": {
+      "main": [
+        [
+          { "node": "Blockers Check", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Blockers Check": {
+      "main": [
+        [
+          { "node": "Exception HITL Gate", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Consolidation HITL Gate", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Exception HITL Gate": {
+      "main": [
+        [
+          { "node": "Exception Handler", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Exception Handler": {
+      "main": [
+        [
+          { "node": "Consolidation HITL Gate", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Hold Status", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Consolidation HITL Gate": {
+      "main": [
+        [
+          { "node": "Consolidation Handler", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Consolidation Handler": {
+      "main": [
+        [
+          { "node": "Start Consolidation", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Hold Status", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Start Consolidation": {
+      "main": [
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Hold Status": {
+      "main": [
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "eod-readiness" },
+    { "name": "agent" },
+    { "name": "risk-medium" },
+    { "name": "hitl-gated" },
+    { "name": "multi-agent" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

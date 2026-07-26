@@ -1,0 +1,326 @@
+{
+  "name": "Specialized — Exception Materiality",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "exception-materiality",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "mat-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 400],
+      "webhookId": "exception-materiality-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/getUnresolvedExceptions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $json.body.region, cutoffTime: $json.body.cutoffTime }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "mat-002",
+      "name": "Get Unresolved Exceptions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 400]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "mat-003",
+      "name": "Loop Exceptions",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [740, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getExposure",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $json.tradeId || $json.exceptionId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "mat-004",
+      "name": "Get Exposure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/classifyMateriality",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ exceptionId: $('Loop Exceptions').item.json.exceptionId, tradeId: $('Loop Exceptions').item.json.tradeId, exposure: $json.exposure, notional: $json.notional }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "mat-005",
+      "name": "Classify Materiality",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, 400]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are an exception materiality analyst. Given exceptions with their materiality classifications and exposure data, explain each classification in business terms. For MATERIAL_BLOCKER: why it blocks (exposure, regulatory). For NON_MATERIAL: why it's tolerable. For REQUIRES_REVIEW: what's ambiguous. Rank material blockers by impact. Output as MaterialityReport with `blockers[]`, `nonMaterial[]`, `reviewRequired[]`.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Region: {{ $('Webhook Trigger').item.json.body.region }}\nCutoff: {{ $('Webhook Trigger').item.json.body.cutoffTime }}\n\nClassified exceptions:\n{{ JSON.stringify($('Loop Exceptions').item.json) }}\n\nExplain each classification in business terms. Rank material blockers by impact. Output as MaterialityReport JSON."
+      },
+      "id": "mat-006",
+      "name": "Classification Explainer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1520, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.output }}",
+              "operation": "contains",
+              "value2": "nonMaterial"
+            }
+          ]
+        }
+      },
+      "id": "mat-007",
+      "name": "Non-Material Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1780, 400]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "exception-approval",
+          "timeout": "2",
+          "timeoutUnit": "hours"
+        }
+      },
+      "id": "mat-008",
+      "name": "Bulk Approval Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2040, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.decision }}",
+              "value2": "APPROVED"
+            }
+          ]
+        }
+      },
+      "id": "mat-009",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2300, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/approveExceptionBatch",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ exceptionIds: $json.body.exceptionIds, approvedBy: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "mat-010",
+      "name": "Approve Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2560, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'SUCCESS', agentId: 'exception-materiality', materialityReport: $('Classification Explainer').item.json.output, bulkApprovalDecision: $('Approval Handler').item.json.body ? $('Approval Handler').item.json.body.decision : 'NOT_APPLICABLE', region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "mat-011",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2820, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Get Unresolved Exceptions", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Unresolved Exceptions": {
+      "main": [
+        [
+          { "node": "Loop Exceptions", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Loop Exceptions": {
+      "main": [
+        [
+          { "node": "Get Exposure", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Classification Explainer", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Exposure": {
+      "main": [
+        [
+          { "node": "Classify Materiality", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Classify Materiality": {
+      "main": [
+        [
+          { "node": "Loop Exceptions", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Classification Explainer": {
+      "main": [
+        [
+          { "node": "Non-Material Check", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Non-Material Check": {
+      "main": [
+        [
+          { "node": "Bulk Approval Gate", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Bulk Approval Gate": {
+      "main": [
+        [
+          { "node": "Approval Handler", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [
+          { "node": "Approve Batch", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Approve Batch": {
+      "main": [
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "exception-materiality" },
+    { "name": "agent" },
+    { "name": "risk-medium" },
+    { "name": "hitl-gated" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

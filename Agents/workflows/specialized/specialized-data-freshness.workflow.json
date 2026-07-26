@@ -1,0 +1,338 @@
+{
+  "name": "Specialized — Data Freshness",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "data-freshness",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "fresh-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 400],
+      "webhookId": "data-freshness-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://data-catalog-service:8093/mcp/getDatasetFreshness",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ datasets: $json.body.datasets, region: $json.body.region }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "fresh-002",
+      "name": "Fetch Freshness",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://data-catalog-service:8093/mcp/getCompleteness",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ datasets: $('Webhook Trigger').item.json.body.datasets, region: $('Webhook Trigger').item.json.body.region }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "fresh-003",
+      "name": "Fetch Completeness",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://data-catalog-service:8093/mcp/getAuthoritativeness",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ datasets: $('Webhook Trigger').item.json.body.datasets, region: $('Webhook Trigger').item.json.body.region }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "fresh-004",
+      "name": "Fetch Authoritativeness",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://data-catalog-service:8093/mcp/getSuitabilityVerdict",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ datasets: $('Webhook Trigger').item.json.body.datasets, process: $('Webhook Trigger').item.json.body.process, region: $('Webhook Trigger').item.json.body.region }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "fresh-005",
+      "name": "Get Suitability Verdict",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.verdict }}",
+              "value2": "BLOCK"
+            }
+          ]
+        }
+      },
+      "id": "fresh-006",
+      "name": "Verdict Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1520, 400]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "Explain why the data freshness gate is blocking this process. Include: (1) which dataset(s) failed, (2) how stale (actual vs max), (3) downstream impact if proceeded, (4) recommended action. Present concisely for a human approver to make an override decision. Never recommend auto-override.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Process: {{ $('Webhook Trigger').item.json.body.process }}\nRegion: {{ $('Webhook Trigger').item.json.body.region }}\nDatasets: {{ $('Webhook Trigger').item.json.body.datasets.join(', ') }}\n\nFreshness data:\n{{ JSON.stringify($('Fetch Freshness').item.json) }}\n\nCompleteness data:\n{{ JSON.stringify($('Fetch Completeness').item.json) }}\n\nAuthoritativeness data:\n{{ JSON.stringify($('Fetch Authoritativeness').item.json) }}\n\nVerdict details:\n{{ JSON.stringify($('Get Suitability Verdict').item.json) }}\n\nExplain why the freshness gate is blocking and what the downstream impact would be."
+      },
+      "id": "fresh-007",
+      "name": "Impact Explainer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "freshness-override",
+          "timeout": "1",
+          "timeoutUnit": "hours"
+        }
+      },
+      "id": "fresh-008",
+      "name": "Override Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2040, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.decision }}",
+              "value2": "APPROVED"
+            }
+          ]
+        }
+      },
+      "id": "fresh-009",
+      "name": "Override Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2300, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://audit-service:8094/mcp/recordException",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: 'DATA_FRESHNESS_OVERRIDE', process: $('Webhook Trigger').item.json.body.process, region: $('Webhook Trigger').item.json.body.region, datasets: $('Webhook Trigger').item.json.body.datasets, approvedBy: $json.body.approverUserId, justification: $json.body.justification, correlationId: $('Webhook Trigger').item.json.body.correlationId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "fresh-010",
+      "name": "Record Exception",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2560, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'SUCCESS', agentId: 'data-freshness', verdict: $('Get Suitability Verdict').item.json.verdict || 'ACCEPT', overrideApplied: $('Override Handler').item.json.body ? $('Override Handler').item.json.body.decision === 'APPROVED' : false, explanation: $('Impact Explainer').item.json ? $('Impact Explainer').item.json.output : null, datasets: $('Webhook Trigger').item.json.body.datasets, process: $('Webhook Trigger').item.json.body.process, correlationId: $('Webhook Trigger').item.json.body.correlationId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "fresh-011",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2820, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Fetch Freshness", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Freshness": {
+      "main": [
+        [
+          { "node": "Fetch Completeness", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Completeness": {
+      "main": [
+        [
+          { "node": "Fetch Authoritativeness", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Authoritativeness": {
+      "main": [
+        [
+          { "node": "Get Suitability Verdict", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Suitability Verdict": {
+      "main": [
+        [
+          { "node": "Verdict Check", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Verdict Check": {
+      "main": [
+        [
+          { "node": "Impact Explainer", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Impact Explainer": {
+      "main": [
+        [
+          { "node": "Override Gate", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Override Gate": {
+      "main": [
+        [
+          { "node": "Override Handler", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Override Handler": {
+      "main": [
+        [
+          { "node": "Record Exception", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Record Exception": {
+      "main": [
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "data-freshness" },
+    { "name": "agent" },
+    { "name": "risk-medium" },
+    { "name": "hitl-gated" },
+    { "name": "pre-process-gate" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

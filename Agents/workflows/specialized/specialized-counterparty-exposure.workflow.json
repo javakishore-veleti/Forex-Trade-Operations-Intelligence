@@ -1,0 +1,269 @@
+{
+  "name": "Specialized — Counterparty Exposure",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "counterparty-exposure",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "cp-exp-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 400],
+      "webhookId": "counterparty-exposure-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getCounterpartyExposure",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ counterpartyId: $json.body.counterpartyId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "cp-exp-002",
+      "name": "Get Exposure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getLimits",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ counterpartyId: $('Webhook Trigger').item.json.body.counterpartyId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "cp-exp-003",
+      "name": "Get Limits",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getConcentration",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ counterpartyId: $('Webhook Trigger').item.json.body.counterpartyId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "cp-exp-004",
+      "name": "Get Concentration",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getCollateral",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ counterpartyId: $('Webhook Trigger').item.json.body.counterpartyId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "cp-exp-005",
+      "name": "Get Collateral",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 640]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getPriorDayExposure",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ counterpartyId: $('Webhook Trigger').item.json.body.counterpartyId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "cp-exp-006",
+      "name": "Get Prior Day Exposure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 800]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a counterparty exposure narrator for an FX platform. Given exposure data, limits, concentration, collateral, and prior-day values — produce a coherent ExposureStory. Include: (1) current position summary, (2) limit utilization (flag >80%), (3) daily change with reason, (4) top-3 concentration risks, (5) collateral adequacy, (6) materiality assessment. Never invent numbers. If any data source failed, note the gap. Output as ExposureStory JSON envelope.",
+          "temperature": 0.2
+        },
+        "promptType": "define",
+        "text": "=Counterparty: {{ $('Webhook Trigger').item.json.body.counterpartyId }}\nQuestion: {{ $('Webhook Trigger').item.json.body.question }}\n\nExposure data:\n{{ JSON.stringify($('Get Exposure').item.json) }}\n\nLimits:\n{{ JSON.stringify($('Get Limits').item.json) }}\n\nConcentration:\n{{ JSON.stringify($('Get Concentration').item.json) }}\n\nCollateral:\n{{ JSON.stringify($('Get Collateral').item.json) }}\n\nPrior day exposure:\n{{ JSON.stringify($('Get Prior Day Exposure').item.json) }}\n\nProduce an ExposureStory narrative. Be precise about numbers and flag any data gaps."
+      },
+      "id": "cp-exp-007",
+      "name": "Narrative Synthesizer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [840, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'SUCCESS', agentId: 'counterparty-exposure', counterpartyId: $('Webhook Trigger').item.json.body.counterpartyId, narrative: $json.output, correlationId: $('Webhook Trigger').item.json.body.correlationId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "cp-exp-008",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1100, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Get Exposure", "type": "main", "index": 0 },
+          { "node": "Get Limits", "type": "main", "index": 0 },
+          { "node": "Get Concentration", "type": "main", "index": 0 },
+          { "node": "Get Collateral", "type": "main", "index": 0 },
+          { "node": "Get Prior Day Exposure", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Exposure": {
+      "main": [
+        [
+          { "node": "Narrative Synthesizer", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Limits": {
+      "main": [
+        [
+          { "node": "Narrative Synthesizer", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Concentration": {
+      "main": [
+        [
+          { "node": "Narrative Synthesizer", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Collateral": {
+      "main": [
+        [
+          { "node": "Narrative Synthesizer", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Prior Day Exposure": {
+      "main": [
+        [
+          { "node": "Narrative Synthesizer", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Narrative Synthesizer": {
+      "main": [
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "counterparty-exposure" },
+    { "name": "agent" },
+    { "name": "risk-low" },
+    { "name": "read-only" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

@@ -1,0 +1,538 @@
+{
+  "name": "Specialized — Shadow Rule Simulator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "shadow-rule-simulator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "shadow-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 400],
+      "webhookId": "shadow-rule-simulator-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://vector-search-service:8090/mcp/searchSimilarDRL",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $json.body.ruleDescription, limit: 5 }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "shadow-002",
+      "name": "DRL Corpus Retrieval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 400]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "Generate a valid Drools DRL rule from the natural-language description. Use the provided DRL examples as style reference. Output ONLY the DRL source code. Ensure proper package declaration, imports, rule name, when/then structure.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Natural-language rule description:\n{{ $('Webhook Trigger').item.json.body.ruleDescription }}\n\nSimilar DRL examples from corpus:\n{{ JSON.stringify($('DRL Corpus Retrieval').item.json) }}\n\nGenerate a valid Drools DRL rule. Output ONLY the DRL source code."
+      },
+      "id": "shadow-003",
+      "name": "NL to DRL Generator",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [740, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://shadow-rules-service:8091/mcp/validateDRL",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ drl: $json.output }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "shadow-004",
+      "name": "Validate DRL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "shadow-005",
+      "name": "Validation Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1260, 400]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "The DRL rule failed validation with the following error. Fix the DRL while preserving the original intent. Output ONLY the corrected DRL source code.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Original NL description:\n{{ $('Webhook Trigger').item.json.body.ruleDescription }}\n\nFailed DRL:\n{{ $('NL to DRL Generator').item.json.output }}\n\nValidation error:\n{{ JSON.stringify($('Validate DRL').item.json.errors) }}\n\nFix the DRL. Output ONLY the corrected DRL source code."
+      },
+      "id": "shadow-006",
+      "name": "Reflection Fix",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1520, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://shadow-rules-service:8091/mcp/validateDRL",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ drl: $json.output }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "shadow-007",
+      "name": "Re-validate DRL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valid || $json.retryCount >= 3 }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "shadow-008",
+      "name": "Retry Counter",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2040, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://shadow-rules-service:8091/mcp/loadShadowRule",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ drl: $json.drl || $json.output, requestedBy: $('Webhook Trigger').item.json.body.requestedBy }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "shadow-009",
+      "name": "Load Shadow Rule",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1520, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://shadow-rules-service:8091/mcp/replayHistoricalEvents",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ window: $('Webhook Trigger').item.json.body.replayWindow || '5d' }) }}",
+        "options": {
+          "timeout": 60000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "shadow-010",
+      "name": "Replay Historical Events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://shadow-rules-service:8091/mcp/readShadowRiskResults",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "shadow-011",
+      "name": "Read Shadow Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2040, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://shadow-rules-service:8091/mcp/diffAgainstProduction",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "shadow-012",
+      "name": "Diff Against Production",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 200]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "Explain the shadow rule impact diff in business terms. Include: (1) trades newly rejected/accepted, (2) risk score changes, (3) affected pairs/books/regions, (4) edge cases found. Never minimize impact. Be precise about numbers.",
+          "temperature": 0.2
+        },
+        "promptType": "define",
+        "text": "=Rule description: {{ $('Webhook Trigger').item.json.body.ruleDescription }}\n\nShadow results:\n{{ JSON.stringify($('Read Shadow Results').item.json) }}\n\nDiff against production:\n{{ JSON.stringify($('Diff Against Production').item.json) }}\n\nExplain the impact in business terms. Be precise about numbers."
+      },
+      "id": "shadow-013",
+      "name": "Impact Explainer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [2560, 200]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "shadow-rule-approval",
+          "timeout": "24",
+          "timeoutUnit": "hours"
+        }
+      },
+      "id": "shadow-014",
+      "name": "HITL Deploy Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2820, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.decision }}",
+              "value2": "APPROVED"
+            }
+          ]
+        }
+      },
+      "id": "shadow-015",
+      "name": "Approval Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3080, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://deployment-service:8092/mcp/deployRule",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ drl: $('Load Shadow Rule').item.json.drl, approvedBy: $json.body.approverUserId, approvalReference: $json.body.approvalReference, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "shadow-016",
+      "name": "Hand Off to Deploy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3340, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://shadow-rules-service:8091/mcp/archiveResults",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ correlationId: $('Webhook Trigger').item.json.body.correlationId, decision: 'DENIED', approverUserId: $json.body.approverUserId || 'timeout' }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "shadow-017",
+      "name": "Archive Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3340, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'COMPLETED', agentId: 'shadow-rule-simulator', impactReport: $('Impact Explainer').item.json.output, decision: $('Approval Check').item.json.body ? $('Approval Check').item.json.body.decision : 'PENDING', correlationId: $('Webhook Trigger').item.json.body.correlationId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "shadow-018",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3600, 200]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "DRL Corpus Retrieval", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "DRL Corpus Retrieval": {
+      "main": [
+        [
+          { "node": "NL to DRL Generator", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "NL to DRL Generator": {
+      "main": [
+        [
+          { "node": "Validate DRL", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Validate DRL": {
+      "main": [
+        [
+          { "node": "Validation Check", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Validation Check": {
+      "main": [
+        [
+          { "node": "Load Shadow Rule", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Reflection Fix", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Reflection Fix": {
+      "main": [
+        [
+          { "node": "Re-validate DRL", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Re-validate DRL": {
+      "main": [
+        [
+          { "node": "Retry Counter", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Retry Counter": {
+      "main": [
+        [
+          { "node": "Load Shadow Rule", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Reflection Fix", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Load Shadow Rule": {
+      "main": [
+        [
+          { "node": "Replay Historical Events", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Replay Historical Events": {
+      "main": [
+        [
+          { "node": "Read Shadow Results", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Read Shadow Results": {
+      "main": [
+        [
+          { "node": "Diff Against Production", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Diff Against Production": {
+      "main": [
+        [
+          { "node": "Impact Explainer", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Impact Explainer": {
+      "main": [
+        [
+          { "node": "HITL Deploy Approval", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "HITL Deploy Approval": {
+      "main": [
+        [
+          { "node": "Approval Check", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Approval Check": {
+      "main": [
+        [
+          { "node": "Hand Off to Deploy", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Archive Results", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Hand Off to Deploy": {
+      "main": [
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Archive Results": {
+      "main": [
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "shadow-rule-simulator" },
+    { "name": "agent" },
+    { "name": "risk-high" },
+    { "name": "hitl-gated" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}
