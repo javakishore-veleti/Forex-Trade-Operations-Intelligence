@@ -16,53 +16,41 @@
 
 ---
 
-Forex-Trade-Operations-Intelligence is a spec-driven, publicly available reference implementation of a runtime-intelligence platform for foreign-exchange trade operations. Built using **Kiro Spec-Driven Development** — every feature progresses through `requirements.md → design.md → tasks.md → code`.
+> **Agents propose. Services execute. Humans approve. Portals visualize.**
 
-## What's Implemented
+A runtime-intelligence platform where AI agents observe live FX trade operations, reconstruct business state across distributed services, reason about anomalies, and coordinate safe recovery — all under human control.
 
-| Layer | Components | Tests |
-|-------|-----------|-------|
-| **Middleware** (7 services) | shared-domain-contracts, trade-ingest, trade-lifecycle, risk-calculation, business-calendar, eod-processing, state-reconciliation | 346 Java tests |
-| **Events** | Kafka topic registry, domain event model (25+ event types), event-sequence-processor (Kafka Streams), DLQ management | 95 tests |
-| **Portals** (3 apps) | Admin (trade investigation, EOD dashboard, risk aggregation, exceptions, HITL approvals), TraderDesk (status, risk explanation, position, book view), FXTradeBlotter (live position, exposure, settlement, counterparty) | Angular 19 |
-| **Observability** | OTel tracing (Jaeger), Prometheus + Grafana (8 dashboards, 6 alert rules), ELK log correlation (4 saved queries) | Config-as-code |
-| **Agents** (4 MVP + 30 specced) | Supervisor, Trade Lifecycle Reconstruction, Canary Probe, DLQ Triage | n8n workflow JSON |
-| **Sidecars** (4 detectors) | KPI Anomaly, DLQ Cluster Analyzer, Capacity Forecast, Log Normalizer | 24 Python tests |
-| **Local Deploy** | MCP server layer (Spring AI), sidecar→agent webhook wiring, n8n import/credential scripts, smoke test | End-to-end |
+---
 
-## Top-Level Directory Structure
+## Table of Contents
 
-| Directory | Role |
-|-----------|------|
-| `Middleware/` | Java 21 / Spring Boot microservices — 7 services + parent Maven POM |
-| `Portals/` | Three Angular 19 standalone portal applications (Admin, TraderDesk, FXTradeBlotter) |
-| `Agents/` | n8n workflow JSON exports — supervisor, specialized, and utility agent workflows |
-| `Sidecars/` | Python 3.11+ detection and embedding sidecar packages |
-| `DevOps/Local/` | Docker Compose per infrastructure role (9 services) + orchestration scripts |
-| `docs/` | ADRs, observability docs, event schema catalogue, diagrams |
-| `.kiro/specs/` | **Spec-driven development** — 71 specs with requirements, design, and tasks |
-| `.github/` | CODEOWNERS + CI workflow placeholders |
+- [The Core Idea](#the-core-idea)
+- [Architecture](#architecture)
+- [What Makes This Different](#what-makes-this-different)
+- [The Agent Fleet](#the-agent-fleet)
+- [Spec-Driven Development](#spec-driven-development-kiro-methodology)
+- [Quick Start](#quick-start)
+- [What's Implemented](#whats-implemented)
+- [Architectural Constraints](#architectural-constraints)
+- [Synthetic Data Policy](#synthetic-data-policy)
 
-## Spec-Driven Development (Kiro Methodology)
+---
 
-This repo demonstrates **full-lifecycle spec-driven development**:
+## The Core Idea
 
-```
-.kiro/specs/
-├── MASTER-PLAN.md                    ← project-wide progress tracking
-├── 01-initial-setup/                 ← technology stack + repo skeleton
-├── architecture-golden-path/         ← cross-cutting NFRs inherited by all services
-├── 02-microservices/                 ← 7 bounded contexts (DDD)
-├── 03-events/                        ← Kafka topics, event schemas, sequence processor, DLQ
-├── 04-portals/                       ← 3 Angular portal feature specs
-├── 05-observability/                 ← OTel tracing, metrics, logging
-├── 06-local-deploy/                  ← MCP server, sidecars, n8n wiring
-└── 07-n8n-agents/                    ← 34 agent specs (requirements + design + tasks)
-```
+A foreign-exchange trade passes through 9 stages across 7 microservices. When something goes wrong — a trade stalls, risk spikes, an event goes missing, a region can't close end-of-day — **34 AI agents** investigate, explain, and propose corrective action. But they never act alone:
 
-See [Kiro-Understanding.md](Kiro-Understanding.md) for the full methodology documentation.
+1. **Sidecar detects** — Python statistical detectors flag anomalies
+2. **Agent investigates** — n8n workflow calls MCP tools on Spring Boot services
+3. **Agent proposes** — LLM reasons about root cause, suggests action from a fixed catalogue
+4. **Human approves** — Ops/Risk Manager reviews in the Admin Portal, clicks Approve
+5. **Service executes** — deterministic Spring Boot service performs the action with the approval token
 
-## Architecture Overview
+No LLM ever computes a risk figure, moves money, or advances trade state. Those are deterministic. Agents add intelligence without compromising correctness.
+
+---
+
+## Architecture
 
 ```mermaid
 flowchart TB
@@ -111,9 +99,62 @@ flowchart TB
     Middleware --> PG & Mongo & Redis
     Seq --> Kafka
     Agents -.->|Risk M/H| HITL
+    HITL -.->|approval request| Admin
+    Admin -.->|approve/reject| HITL
 ```
 
-> See [docs/diagrams/](docs/diagrams/) for detailed C4, data-flow, and infrastructure diagrams.
+> See [docs/diagrams/](docs/diagrams/) for C4 system context, container view, trade lifecycle flow, agent architecture, and local infrastructure diagrams.
+
+---
+
+## What Makes This Different
+
+| Aspect | This Platform | Typical AI Agent Demos |
+|--------|--------------|----------------------|
+| **Risk boundary** | LLMs never compute numbers — deterministic services do | LLM does everything |
+| **Action safety** | Every M/H action gated by human approval | Autonomous execution |
+| **Permitted actions** | Fixed enum catalogue — agents select, never invent | LLM generates arbitrary actions |
+| **Observability** | Full OTel tracing + 8 Grafana dashboards + ELK | Console.log |
+| **Spec-driven** | 71 specs with requirements → design → tasks → code | Code-first, docs maybe later |
+| **Multi-store reconciliation** | Canonical state from event history, not majority vote | Single DB assumed |
+| **Production-grade** | Kafka transactional producers, idempotency, DLQ, circuit breakers | Happy-path only |
+
+---
+
+## The Agent Fleet
+
+34 agents organized by operational concern:
+
+| Theme | Agents | Risk |
+|-------|--------|------|
+| **Trade Lifecycle & State** | Lifecycle Reconstruction, State Divergence, Event Integrity, Duplicate Effect Guard, Amendment Ripple | L–H |
+| **Risk & Rules** | Risk Explainability, Rule Impact, Rule Coverage, Shadow Rule Simulator, Counterparty Exposure | L–H |
+| **EOD & Readiness** | EOD Readiness, Data Freshness, Exception Materiality, Settlement Fail Predictor, Databricks Lineage, Regulatory Reporting | M–H |
+| **Event & Data Integrity** | DLQ Triage, Consumer Lag Predictor, Market Data Staleness, Schema Drift, Cutoff Calendar, Retry Storm | M–H |
+| **Observability → Business** | Change Correlation, Business KPI Guard, Trace Latency, Canary Probe, Runtime Intent | L–M |
+| **Dependency & Blast Radius** | Contagion Analysis, Service Genome | L |
+| **Capacity & Economics** | Capacity Backlog, Adaptive Routing, FinOps Cost | H |
+| **Recovery** | Transaction Recovery Coordinator | H |
+| **Interface** | Supervisor (routes to all others) | L (inherits) |
+
+---
+
+## Spec-Driven Development (Kiro Methodology)
+
+Every feature in this repo progressed through:
+
+```
+requirements.md  →  design.md  →  tasks.md  →  code
+```
+
+- **Requirements** are technology-agnostic (reference Technology Roles, not product names)
+- **Design** resolves roles to concrete products (the agnostic → concrete boundary)
+- **Tasks** are atomic, ordered, independently verifiable (a living checklist)
+- **Code** is generated from tasks, verified per section, committed incrementally
+
+71 specs. 46 ADRs. 5 Kiro hooks. Full methodology documented in [Kiro-Understanding.md](Kiro-Understanding.md).
+
+---
 
 ## Quick Start
 
@@ -131,6 +172,22 @@ npm run status
 npm run stop
 ```
 
+---
+
+## What's Implemented
+
+| Layer | Components | Tests |
+|-------|-----------|-------|
+| **Middleware** (7 services) | shared-domain-contracts, trade-ingest, trade-lifecycle, risk-calculation, business-calendar, eod-processing, state-reconciliation | 346 Java tests |
+| **Events** | Kafka topic registry, domain event model (25+ event types), event-sequence-processor (Kafka Streams), DLQ management | 95 tests |
+| **Portals** (3 apps) | Admin (trade investigation, EOD dashboard, risk aggregation, exceptions, HITL approvals), TraderDesk (status, risk explanation, position, book view), FXTradeBlotter (live position, exposure, settlement, counterparty) | Angular 19 |
+| **Observability** | OTel tracing (Jaeger), Prometheus + Grafana (8 dashboards, 6 alert rules), ELK log correlation (4 saved queries) | Config-as-code |
+| **Agents** (4 MVP + 30 specced) | Supervisor, Trade Lifecycle Reconstruction, Canary Probe, DLQ Triage | n8n workflow JSON |
+| **Sidecars** (4 detectors) | KPI Anomaly, DLQ Cluster Analyzer, Capacity Forecast, Log Normalizer | 24 Python tests |
+| **Local Deploy** | MCP server layer (Spring AI), sidecar→agent webhook wiring, n8n import/credential scripts, smoke test | End-to-end |
+
+---
+
 ## Architectural Constraints
 
 - **Spring Boot only** for microservices — all business/transactional logic
@@ -140,6 +197,8 @@ npm run stop
 - **Every M/H-risk agent action** → propose → simulate → impact report → human approval → execute
 
 See [docs/adr/0001-monorepo-language-boundaries.md](docs/adr/0001-monorepo-language-boundaries.md) for the full ADR.
+
+---
 
 ## Synthetic Data Policy
 
