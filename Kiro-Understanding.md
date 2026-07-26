@@ -1,60 +1,85 @@
 # Kiro Understanding — Spec-Driven Development Workflow
 
-This document captures Kiro's guidance on how this project progresses from specification to
-production, and the build sequence it recommends. It is the shared understanding between Kiro,
-Claude Code, and the developer for how work proceeds.
+This document captures the Kiro spec-driven development methodology demonstrated by this
+project. It is the shared understanding between Kiro, Claude Code, and the developer for
+how work proceeds.
 
-## The three-document progression (per feature)
+## The Three-Document Progression (per feature)
 
-In the Kiro workflow, every feature/spec advances through three documents, then code:
+Every feature/spec advances through three documents, then code:
 
 ```
 requirements.md  →  design.md  →  tasks.md  →  code
 ```
 
-- **`requirements.md`** — the *what* and *why*. Feature requirements, acceptance criteria
-  (EARS style), success metrics. In this repo these are **technology-agnostic** (reference
-  Technology Roles) and **business/domain-focused** (each microservice is a DDD bounded context
-  inheriting cross-cutting NFRs from the architecture golden path).
-- **`design.md`** — the technical design that satisfies those requirements:
-  - Class/module structure, API contracts, DB schema, Kafka topic/event shapes
-  - Sequence diagrams for key flows
-  - Data-model decisions, error-handling strategy
-  - How the service inherits and applies the golden-path NFRs
-  - This is where **Technology Roles resolve to concrete products** (the agnostic → concrete boundary).
-- **`tasks.md`** — the concrete implementation checklist derived from the design:
-  - Ordered, atomic tasks an agent (or developer) can execute one at a time
-  - Each task maps to a specific file or unit of work
-  - Tasks scoped so each one can be verified independently
+- **`requirements.md`** — the *what* and *why*. Feature requirements, acceptance criteria,
+  user stories. Technology-agnostic (references Technology Roles, not product names).
+  Business/domain-focused (each microservice is a DDD bounded context inheriting cross-cutting
+  NFRs from the architecture golden path).
+- **`design.md`** — the technical *how*. Resolves Technology Roles to concrete products.
+  Defines class/module structure, API contracts, DB schema, event shapes, sequence flows,
+  golden-path NFR realization, testing strategy, and requirement traceability.
+- **`tasks.md`** — the concrete implementation checklist. Ordered, atomic tasks. Each maps to
+  a specific file. Each is independently verifiable. A living checklist marked `[x]` as
+  tasks complete.
 
-Once `tasks.md` exists for a spec, you **execute** it — generating the code, running the build,
-running tests, and iterating until all tasks are checked off.
+## Architectural Decisions (enforced by specs)
 
-Current state: `requirements.md` is done for 10 specs; `design.md` started with
-`02-microservices/03-trade-lifecycle-service` (reference example). The remaining two documents
-per spec are still to be produced.
+| Decision | Rule |
+|---|---|
+| Tech single-source-of-truth | `01-initial-setup/01-technology-stack` owns all product+version bindings |
+| NFR single-source-of-truth | `architecture-golden-path/01-service-nfrs` owns all cross-cutting NFRs |
+| Agnostic specs | requirements.md references Technology Roles, never product names |
+| Concrete in design | design.md is where roles resolve to products |
+| Golden-path inheritance | Every microservice inherits GP-Rq-1..14; restates only business requirements |
+| DDD bounded contexts | Each service is its own bounded context with ubiquitous language |
+| Shared kernel | `shared-domain-contracts` provides the shared types (not a running service) |
 
-## The build sequence for this project
+## Current Project State (2026-07-25)
 
-Given the build order defined in `MASTER-PLAN.md`, the natural next steps in order are:
+| Phase | Specs | Req | Design | Tasks | Code |
+|---|---|---|---|---|---|
+| 01-initial-setup | 2 | ✅ | ✅ | ✅ | ✅ |
+| architecture-golden-path | 1 | ✅ | n/a | n/a | n/a |
+| 02-microservices | 7 | ✅ | ✅ | ✅ | ✅ (346 tests) |
+| 03-events | 4 | ✅ | ✅ | ✅ | ✅ (95 tests) |
+| 04-portals | 3 | ✅ | ✅ | ✅ | ✅ |
+| 05-observability | 4 | ✅ | ✅ | ✅ | ✅ |
+| 06-local-deploy | 3 | ✅ | ✅ | ✅ | ✅ |
+| 07-n8n-agents | 34 | ✅ | ✅ | ✅ | 4/34 (MVP) |
+| 08-aws-deploy | 7 | ⬜ | ⬜ | ⬜ | ⬜ |
+| 09-azure-deploy | 6 | ⬜ | ⬜ | ⬜ | ⬜ |
 
-1. **Write `design.md` + `tasks.md` for the 7 microservices (Phase 02)** — these are the
-   foundation everything else depends on.
-2. **Generate the microservice code** — scaffold, implement, and test each service.
-3. **Phase 03 — Events** — Kafka topics, domain-event schemas, sequence processor, DLQ.
-4. **Phase 04 — Portals** — the three Angular apps.
-5. **Phase 05 — Observability** — OpenTelemetry instrumentation across all services.
-6. **Phase 06 — Local deploy** — wire the MCP server, Python sidecars, and n8n locally. This is
-   the first time an agent can run end-to-end.
-7. **Phase 07 — Agents** — implement the 34 n8n workflow JSONs.
-8. **Phase 08 / 09 — Cloud deploy** — AWS or Azure.
+## Build Order (realized)
 
-## The critical dependency
+1. ✅ **Shared Domain Contracts** — compile-scope library, no runtime framework
+2. ✅ **Trade Ingest Service** — REST capture, validation, idempotency, Kafka publish
+3. ✅ **Trade Lifecycle Service** — state machine, Kafka consumer, MongoDB audit
+4. ✅ **Risk Calculation Service** — Drools, BigDecimal arithmetic, aggregations
+5. ✅ **Business Calendar Service** — DST-aware java.time, immutable CalendarRegistry
+6. ✅ **EOD Processing Service** — close orchestration, pure ReadinessEvaluator
+7. ✅ **State Reconciliation Service** — read-only canonical-state authority
+8. ✅ **Events** — topic registry, event model, sequence processor, DLQ
+9. ✅ **Portals** — 3 Angular apps with 13 feature views
+10. ✅ **Observability** — OTel tracing, Prometheus metrics, Grafana dashboards, ELK
+11. ✅ **Local Deploy** — MCP server layer, Python sidecars, n8n wiring
+12. 🔄 **n8n Agents** — 4/34 implemented (supervisor, trade-lifecycle, canary-probe, dlq-triage)
 
-Phases 06 and 07 (agents) **cannot** be built until the Spring Boot services (02), events (03),
-and local-deploy infrastructure (06) exist — because agents call MCP tools that are backed by
-those services.
+## Kiro Hooks
 
-## In short
+| Hook | Purpose | Status |
+|---|---|---|
+| `auto-commit-specs` | Git-commit every spec file save | ✅ active |
+| `validate-spec-agnostic` | Warn on product names in requirements | ✅ active |
+| `guard-no-secrets` | Warn on secrets in implementation files | ✅ active |
+| `sync-spec-status` | Update MASTER-PLAN on design/tasks creation | ⬜ defined |
+| `update-master-plan-progress` | Mark code complete when all tasks ticked | ⬜ defined |
 
-> The spec work is the blueprint. Implementation is next.
+## Tools Used
+
+- **Kiro CLI** — spec management, quality audit, status tracking, implementation
+- **Claude Code CLI** — bulk code generation, parallel spec authoring
+- **Kiro IDE** — visual spec navigation, sub-agent task execution
+
+All three tools read the same `.kiro/specs/` files and produce the same standard output.
+The spec structure is tool-agnostic — it's plain markdown files in Git.

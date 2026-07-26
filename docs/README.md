@@ -1,19 +1,39 @@
 # Documentation
 
-Design documentation, architecture decisions, and diagrams for the FX Trade Operations Intelligence platform.
-
 ## Table of Contents
 
-| Section | Path | Description |
-|---------|------|-------------|
-| ADRs | [adr/](adr/) | Architecture Decision Records |
-| Diagrams | [diagrams/](diagrams/) | Architecture and design diagrams |
+### Architecture Decision Records
+| ADR | Title |
+|-----|-------|
+| [0001](adr/0001-monorepo-language-boundaries.md) | Monorepo Language Boundaries |
+| [0002](adr/0002-spec-driven-development.md) | Spec-Driven Development Methodology |
+| [0003](adr/0003-golden-path-nfr-inheritance.md) | Golden Path NFR Inheritance |
+| [0004](adr/0004-determinism-llm-boundary.md) | Determinism and LLM Boundary |
+| [0005](adr/0005-event-driven-architecture.md) | Event-Driven Architecture with Kafka |
+| [0006](adr/0006-mcp-tool-protocol.md) | MCP Tool Protocol for Agent-Service Communication |
+| [0007](adr/0007-multi-tool-ai-strategy.md) | Multi-Tool AI Development Strategy |
 
-## Key Documents
+### Observability
+| Document | Description |
+|----------|-------------|
+| [span-naming.md](observability/span-naming.md) | OpenTelemetry span naming conventions |
+| [kafka-tracing.md](observability/kafka-tracing.md) | W3C TraceContext propagation through Kafka |
+| [structured-logging.md](observability/structured-logging.md) | JSON structured log format specification |
 
-- [ADR-0001: Monorepo Language Boundaries](adr/0001-monorepo-language-boundaries.md) — Foundational decision on Java/n8n/Python tier boundaries
+### Events
+| Document | Description |
+|----------|-------------|
+| [schema-catalogue.md](events/schema-catalogue.md) | Domain event schema catalogue (all event types) |
 
-## Notes
+### Diagrams
+See [diagrams/README.md](diagrams/README.md) for diagramming conventions.
 
-- All documentation uses synthetic `FX-` identifiers.
-- No real financial data or PII is included in any document.
+### Key Design Documents (repo root)
+| Document | Description |
+|----------|-------------|
+| [README.md](../README.md) | Project overview and quick start |
+| [Kiro-Understanding.md](../Kiro-Understanding.md) | Kiro SDD methodology documentation |
+| [PRD.md](../PRD.md) | Product Requirements Document |
+| [runtime_agents_catalog.md](../runtime_agents_catalog.md) | 34-agent master catalog |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | Contribution guidelines |
+| [CLAUDE.md](../CLAUDE.md) | Claude Code guidance file |
