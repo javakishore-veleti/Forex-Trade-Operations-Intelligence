@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Update MASTER-PLAN progress on task completion",
+      "trigger": "PostFileSave",
+      "matcher": "\\.kiro/specs/.*/tasks\\.md$",
+      "action": {
+        "type": "command",
+        "command": "FILE=\"{{filePath}}\"; TOTAL=$(grep -c '^- \\[' \"$FILE\" 2>/dev/null || echo 0); DONE=$(grep -c '^- \\[x\\]' \"$FILE\" 2>/dev/null || echo 0); if [ \"$TOTAL\" -gt 0 ] && [ \"$TOTAL\" -eq \"$DONE\" ]; then SPEC=$(echo \"$FILE\" | sed 's|.*/specs/||' | sed 's|/tasks.md||'); echo \"✅ All $TOTAL tasks complete in $SPEC\"; fi"
+      }
+    }
+  ]
+}

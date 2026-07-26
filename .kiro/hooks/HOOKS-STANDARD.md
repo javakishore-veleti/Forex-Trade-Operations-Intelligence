@@ -9,111 +9,88 @@
 ## What Are Kiro Hooks?
 
 Kiro hooks are event-driven automations that fire on specific triggers within
-the Kiro CLI agent session. They run shell commands or scripts automatically
-when a defined condition is met (e.g. a file is saved, a spec stage completes).
-They are **not** git hooks — they are Kiro session hooks.
+the Kiro CLI/IDE agent session. They run shell commands automatically when a
+defined condition is met (e.g. a file is saved). They are **not** git hooks —
+they are Kiro session hooks.
 
 **Key properties:**
-- `trigger`: when the hook fires (`PostFileSave`, `PostToolUse`, etc.)
-- `matcher`: a regex pattern that filters which files/events activate the hook
+- `trigger`: when the hook fires (`PostFileSave`)
+- `matcher`: a regex pattern that filters which files activate the hook
 - `action`: the shell command to execute when triggered
 
 ---
 
-## Hook Catalogue (Normative)
+## Hook Catalogue (all active)
 
-### Hook 1: `auto-commit-specs` ✅ (active)
+### Hook 1: `auto-commit-specs` ✅
 
 **File:** `auto-commit-specs.json`
-**Purpose:** Automatically stages and commits any spec file change
-(requirements, design, tasks) to git so that spec evolution is fully
-version-controlled without manual commits.
-
+**Purpose:** Automatically stages and commits any spec file change to git so
+that spec evolution is fully version-controlled without manual commits.
 **Trigger:** `PostFileSave`
 **Matcher:** `\.kiro/specs/.*\.md$`
-**Fires when:** Any `.md` file under `.kiro/specs/` is saved.
-**Action:** `git add .kiro/specs/` → compute changed files → `git commit`
-with a message derived from the spec folder path.
-**Idempotency:** Only commits if `git diff --cached` shows staged changes.
+**Action:** `git add .kiro/specs/` → commit with message derived from the
+spec folder path.
 
 ---
 
-### Hook 2: `validate-spec-agnostic` ⬜ (to be implemented)
+### Hook 2: `validate-spec-agnostic` ✅
 
 **File:** `validate-spec-agnostic.json`
-**Purpose:** When a spec `requirements.md` is saved, scan it for product
-names or version numbers that violate the technology-agnostic rule. Warn
-if any are found so the violation is caught immediately, not at review time.
-
+**Purpose:** When a `requirements.md` is saved, scan for product names or
+version numbers that violate the technology-agnostic rule. Warns immediately.
 **Trigger:** `PostFileSave`
 **Matcher:** `\.kiro/specs/.*/requirements\.md$`
-**Fires when:** Any `requirements.md` under `.kiro/specs/` is saved.
-**Action:** Run a grep against the saved file for known banned terms
-(e.g. `Spring Boot`, `PostgreSQL`, `Redis`, `Angular`, `Kafka`, `3\.4\.`,
-`Java 21`, `python:3\.`) and print a warning to the terminal if any are found.
-**Does NOT block the save** — it warns only.
+**Action:** Grep for banned terms (Spring Boot, PostgreSQL, Redis, etc.) and
+print a warning if found. Does NOT block the save.
 
 ---
 
-### Hook 3: `update-master-plan-progress` ⬜ (to be implemented)
+### Hook 3: `update-master-plan-progress` ✅
 
 **File:** `update-master-plan-progress.json`
-**Purpose:** When a `tasks.md` is saved with all tasks checked (`[x]`),
-automatically update the progress table in `MASTER-PLAN.md` to mark that
-spec's code phase complete.
-
+**Purpose:** When a `tasks.md` is saved with all tasks checked `[x]`, print a
+notification that the spec is fully implemented.
 **Trigger:** `PostFileSave`
 **Matcher:** `\.kiro/specs/.*/tasks\.md$`
-**Fires when:** Any `tasks.md` under `.kiro/specs/` is saved.
-**Action:** Check if all tasks in the file are `[x]`. If yes, identify the
-spec folder name and update the corresponding row in `MASTER-PLAN.md`
-progress table from `⬜` to `✅` for the code column.
+**Action:** Count total `- [` lines and `- [x]` lines. If equal, print
+"✅ All N tasks complete in {spec-name}".
 
 ---
 
-### Hook 4: `guard-no-secrets` ⬜ (to be implemented)
+### Hook 4: `guard-no-secrets` ✅
 
 **File:** `guard-no-secrets.json`
-**Purpose:** When any file under `Middleware/`, `Agents/`, `Sidecars/`, or
-`DevOps/` is saved, scan for patterns that look like secrets (passwords,
-API keys, connection strings with credentials) and warn immediately.
-
+**Purpose:** When any implementation file is saved, scan for patterns that
+look like secrets (passwords, API keys, connection strings with credentials)
+and warn immediately.
 **Trigger:** `PostFileSave`
 **Matcher:** `^(Middleware|Agents|Sidecars|DevOps)/.*`
-**Fires when:** Any file in the implementation directories is saved.
-**Action:** Grep for patterns: `password\s*=\s*[^\$\{]`, `api.key\s*=`,
-`secret\s*=\s*[^\$\{]`, `Bearer [A-Za-z0-9]`. Print a warning with the
-file name and line number if found.
-**Does NOT block the save** — it warns only.
+**Action:** Grep for secret patterns. Print a warning with file name and line
+number if found. Does NOT block the save.
 
 ---
 
-### Hook 5: `sync-spec-status` ⬜ (to be implemented)
+### Hook 5: `sync-spec-status` ✅
 
 **File:** `sync-spec-status.json`
-**Purpose:** When a `design.md` or `tasks.md` is **created** (not just saved),
-update `MASTER-PLAN.md` to reflect that the design or tasks stage is now
-present for that spec.
-
+**Purpose:** When a `design.md` or `tasks.md` is created or updated, print
+a notification identifying which spec stage was saved.
 **Trigger:** `PostFileSave`
 **Matcher:** `\.kiro/specs/.*/(design|tasks)\.md$`
-**Fires when:** A new `design.md` or `tasks.md` is created under any spec folder.
-**Action:** Identify the spec from the path, update the corresponding row
-in the MASTER-PLAN progress table to mark the stage present.
+**Action:** Print "📋 Spec stage '{stage}' saved for: {spec-path}".
 
 ---
 
-## Implementation Order
+## Summary
 
-Hooks are implemented in this priority order:
-
-| Priority | Hook | Reason |
-|---|---|---|
-| 1 | `auto-commit-specs` | ✅ Already active — most critical for version control |
-| 2 | `guard-no-secrets` | Safety first — catches accidental secret commits |
-| 3 | `validate-spec-agnostic` | Quality gate — catches product-name violations immediately |
-| 4 | `sync-spec-status` | Progress tracking — keeps MASTER-PLAN accurate |
-| 5 | `update-master-plan-progress` | Automation — removes manual progress updates |
+| # | Hook | File | Status |
+|---|---|---|---|
+| 1 | auto-commit-specs | `auto-commit-specs.json` | ✅ active |
+| 2 | validate-spec-agnostic | `validate-spec-agnostic.json` | ✅ active |
+| 3 | update-master-plan-progress | `update-master-plan-progress.json` | ✅ active |
+| 4 | guard-no-secrets | `guard-no-secrets.json` | ✅ active |
+| 5 | sync-spec-status | `sync-spec-status.json` | ✅ active |
 
 ---
 
@@ -141,3 +118,4 @@ Hooks are implemented in this priority order:
 - Commands must be idempotent — running twice must not cause side effects.
 - Commands must not block indefinitely — use timeouts where appropriate.
 - Hooks must not commit secrets, real data, or non-synthetic identifiers.
+- Use `{{filePath}}` template variable for the saved file path.

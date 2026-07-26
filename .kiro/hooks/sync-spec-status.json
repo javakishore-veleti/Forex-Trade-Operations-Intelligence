@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Sync spec status on design or tasks creation",
+      "trigger": "PostFileSave",
+      "matcher": "\\.kiro/specs/.*/(design|tasks)\\.md$",
+      "action": {
+        "type": "command",
+        "command": "FILE=\"{{filePath}}\"; SPEC=$(echo \"$FILE\" | sed 's|.*/specs/||' | sed 's|/design.md||' | sed 's|/tasks.md||'); STAGE=$(basename \"$FILE\" .md); echo \"📋 Spec stage '$STAGE' saved for: $SPEC\""
+      }
+    }
+  ]
+}
