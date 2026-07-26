@@ -1,0 +1,87 @@
+[
+  {
+    "name": "detect healthy canary with all probes passing",
+    "input": {
+      "probeType": "FULL_LIFECYCLE",
+      "region": "APAC",
+      "timestamp": "2025-03-15T08:00:00Z"
+    },
+    "expectedToolCalls": ["getCanaryResults", "evaluateHealthStatus"],
+    "expectedOutputContains": {
+      "status": "HEALTHY",
+      "region": "APAC",
+      "probesPassed": 5,
+      "probesFailed": 0,
+      "latencyP95Ms": 245
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "detect degraded pipeline with latency breach",
+    "input": {
+      "probeType": "FULL_LIFECYCLE",
+      "region": "EMEA",
+      "timestamp": "2025-03-15T14:30:00Z"
+    },
+    "expectedToolCalls": ["getCanaryResults", "evaluateHealthStatus", "getLatencyBreakdown"],
+    "expectedOutputContains": {
+      "status": "DEGRADED",
+      "region": "EMEA",
+      "degradedStage": "risk-calculation",
+      "latencyP95Ms": 4200,
+      "threshold": 2000
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "detect failed canary with missing event",
+    "input": {
+      "probeType": "FULL_LIFECYCLE",
+      "region": "AMER",
+      "timestamp": "2025-03-15T16:00:00Z"
+    },
+    "expectedToolCalls": ["getCanaryResults", "evaluateHealthStatus", "identifyFailurePoint"],
+    "expectedOutputContains": {
+      "status": "FAILED",
+      "region": "AMER",
+      "failurePoint": "trade-lifecycle-service",
+      "missingEvent": "TRADE_VALIDATED",
+      "lastReceivedEvent": "TRADE_INGESTED"
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "trigger alert escalation for consecutive failures",
+    "input": {
+      "probeType": "FULL_LIFECYCLE",
+      "region": "AMER",
+      "consecutiveFailures": 3,
+      "timestamp": "2025-03-15T16:15:00Z"
+    },
+    "expectedToolCalls": ["getCanaryResults", "evaluateHealthStatus", "getFailureHistory", "escalateAlert"],
+    "expectedOutputContains": {
+      "status": "CRITICAL",
+      "region": "AMER",
+      "consecutiveFailures": 3,
+      "escalation": "PAGER",
+      "affectedServices": ["trade-lifecycle-service"]
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "propose canary injection during maintenance window",
+    "input": {
+      "probeType": "TARGETED",
+      "targetService": "eod-processing",
+      "reason": "Post-deployment validation"
+    },
+    "expectedToolCalls": ["checkMaintenanceWindow", "proposeCanaryInjection"],
+    "expectedOutputContains": {
+      "status": "PENDING_APPROVAL",
+      "probeType": "TARGETED",
+      "targetService": "eod-processing",
+      "requiresApproval": true
+    },
+    "expectedRiskGate": true
+  }
+]

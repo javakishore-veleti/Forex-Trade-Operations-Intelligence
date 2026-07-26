@@ -1,0 +1,83 @@
+[
+  {
+    "name": "explain risk breach for single trade",
+    "input": {
+      "tradeId": "FX-000501",
+      "query": "Why was this trade flagged as high risk?"
+    },
+    "expectedToolCalls": ["getTrade", "getRiskCalculation", "getRulesTriggered", "buildExplanation"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "tradeId": "FX-000501",
+      "riskLevel": "HIGH",
+      "triggeredRules": ["NOTIONAL_THRESHOLD_BREACH", "COUNTERPARTY_LIMIT_WARN"]
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "compare risk before and after trade amendment",
+    "input": {
+      "tradeId": "FX-000502",
+      "amendmentVersion": 2,
+      "query": "How did the amendment change the risk profile?"
+    },
+    "expectedToolCalls": ["getTrade", "getRiskCalculation", "getRiskHistory", "buildDiffExplanation"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "tradeId": "FX-000502",
+      "riskBefore": "MEDIUM",
+      "riskAfter": "HIGH",
+      "changedFactors": ["notionalAmount", "settlementDate"],
+      "newRulesTriggered": ["SETTLEMENT_CONCENTRATION_RISK"]
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "explain aggregated book-level risk",
+    "input": {
+      "bookId": "FX-BOOK-ASIA-01",
+      "query": "What is driving the elevated risk in this book?"
+    },
+    "expectedToolCalls": ["getBookTrades", "getBookRiskAggregation", "identifyRiskDrivers"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "bookId": "FX-BOOK-ASIA-01",
+      "aggregateRiskLevel": "HIGH",
+      "topDrivers": ["CONCENTRATION_SINGLE_COUNTERPARTY", "TENOR_CLUSTER"]
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "handle trade with no risk flags",
+    "input": {
+      "tradeId": "FX-000503",
+      "query": "Explain the risk calculation for this trade"
+    },
+    "expectedToolCalls": ["getTrade", "getRiskCalculation", "buildExplanation"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "tradeId": "FX-000503",
+      "riskLevel": "LOW",
+      "triggeredRules": []
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "propose risk limit override with HITL gate",
+    "input": {
+      "tradeId": "FX-000504",
+      "action": "requestLimitOverride",
+      "justification": "Client hedging existing exposure - net risk reduces"
+    },
+    "expectedToolCalls": ["getTrade", "getRiskCalculation", "assessOverrideImpact", "proposeOverride"],
+    "expectedOutputContains": {
+      "status": "PENDING_APPROVAL",
+      "tradeId": "FX-000504",
+      "overrideType": "COUNTERPARTY_LIMIT",
+      "riskLevel": "HIGH",
+      "requiresApproval": true,
+      "approverRole": "RISK_MANAGER"
+    },
+    "expectedRiskGate": true
+  }
+]

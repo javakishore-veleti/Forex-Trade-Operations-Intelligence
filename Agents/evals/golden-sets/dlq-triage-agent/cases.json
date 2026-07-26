@@ -1,0 +1,103 @@
+[
+  {
+    "name": "cluster DLQ messages by error type",
+    "input": {
+      "topic": "trade-ingest.dlq",
+      "timeRange": "2025-03-15T06:00:00Z/2025-03-15T12:00:00Z",
+      "action": "cluster"
+    },
+    "expectedToolCalls": ["getDlqMessages", "clusterByErrorType", "summarizeClusters"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "totalMessages": 47,
+      "clusters": [
+        {"errorType": "SCHEMA_VALIDATION_FAILED", "count": 31},
+        {"errorType": "COUNTERPARTY_NOT_FOUND", "count": 12},
+        {"errorType": "TIMEOUT", "count": 4}
+      ]
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "identify root cause for schema validation cluster",
+    "input": {
+      "topic": "trade-ingest.dlq",
+      "clusterId": "cluster-schema-001",
+      "action": "rootCause"
+    },
+    "expectedToolCalls": ["getDlqMessages", "analyzeCluster", "correlateWithDeployments"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "rootCause": "SCHEMA_BREAKING_CHANGE",
+      "correlatedEvent": "deployment-trade-ingest-v2.3.1",
+      "affectedField": "settlementDate"
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "propose replay for transient timeout errors",
+    "input": {
+      "topic": "trade-ingest.dlq",
+      "clusterId": "cluster-timeout-001",
+      "action": "proposeRemediation"
+    },
+    "expectedToolCalls": ["getDlqMessages", "analyzeCluster", "checkServiceHealth", "proposeReplay"],
+    "expectedOutputContains": {
+      "status": "PENDING_APPROVAL",
+      "remediation": "REPLAY",
+      "messageCount": 4,
+      "reason": "Transient timeout - service now healthy",
+      "riskLevel": "MEDIUM",
+      "requiresApproval": true
+    },
+    "expectedRiskGate": true
+  },
+  {
+    "name": "reject replay for poison-pill messages",
+    "input": {
+      "topic": "trade-ingest.dlq",
+      "clusterId": "cluster-schema-001",
+      "action": "proposeRemediation"
+    },
+    "expectedToolCalls": ["getDlqMessages", "analyzeCluster", "assessReplayability"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "remediation": "MANUAL_FIX_REQUIRED",
+      "reason": "Messages will fail again - schema incompatibility persists",
+      "replayable": false
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "generate DLQ health summary across all topics",
+    "input": {
+      "action": "healthSummary",
+      "timeRange": "2025-03-15T00:00:00Z/2025-03-15T23:59:59Z"
+    },
+    "expectedToolCalls": ["getAllDlqTopics", "getDlqMetrics", "buildHealthSummary"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "totalDlqMessages": 63,
+      "trend": "INCREASING"
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "execute approved bulk replay",
+    "input": {
+      "topic": "trade-ingest.dlq",
+      "clusterId": "cluster-timeout-001",
+      "action": "executeReplay",
+      "approvalId": "HITL-APPROVAL-FX-0042"
+    },
+    "expectedToolCalls": ["verifyApproval", "replayMessages", "monitorReplayOutcome"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "replayed": 4,
+      "succeeded": 4,
+      "failed": 0,
+      "approvalId": "HITL-APPROVAL-FX-0042"
+    },
+    "expectedRiskGate": false
+  }
+]

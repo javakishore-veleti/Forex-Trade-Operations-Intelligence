@@ -1,0 +1,90 @@
+[
+  {
+    "name": "assess EOD readiness with all checks passing",
+    "input": {
+      "region": "EMEA",
+      "businessDate": "2025-03-15",
+      "cutoffTime": "18:00:00Z"
+    },
+    "expectedToolCalls": ["getEodChecklist", "evaluateTradeCompleteness", "evaluateDlqStatus", "evaluateReconciliation", "buildReadinessReport"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "region": "EMEA",
+      "readiness": "GREEN",
+      "checksTotal": 8,
+      "checksPassed": 8,
+      "checksFailed": 0
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "detect EOD blocker due to unresolved DLQ",
+    "input": {
+      "region": "AMER",
+      "businessDate": "2025-03-15",
+      "cutoffTime": "22:00:00Z"
+    },
+    "expectedToolCalls": ["getEodChecklist", "evaluateTradeCompleteness", "evaluateDlqStatus", "buildReadinessReport"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "region": "AMER",
+      "readiness": "RED",
+      "permittedActions": ["investigateDlq", "requestOverride"]
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "detect EOD warning due to pending reconciliation",
+    "input": {
+      "region": "APAC",
+      "businessDate": "2025-03-15",
+      "cutoffTime": "10:00:00Z"
+    },
+    "expectedToolCalls": ["getEodChecklist", "evaluateTradeCompleteness", "evaluateDlqStatus", "evaluateReconciliation", "buildReadinessReport"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "region": "APAC",
+      "readiness": "AMBER",
+      "permittedActions": ["proceedWithEod", "waitForReconciliation"]
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "propose EOD override for non-critical blocker",
+    "input": {
+      "region": "AMER",
+      "businessDate": "2025-03-15",
+      "action": "requestEodOverride",
+      "blockerId": "DLQ_EMPTY",
+      "justification": "DLQ messages are non-trade-impacting schema warnings"
+    },
+    "expectedToolCalls": ["getEodChecklist", "assessOverrideRisk", "proposeOverride"],
+    "expectedOutputContains": {
+      "status": "PENDING_APPROVAL",
+      "overrideType": "EOD_BLOCKER_BYPASS",
+      "riskLevel": "HIGH",
+      "requiresApproval": true,
+      "approverRole": "EOD_CONTROLLER"
+    },
+    "expectedRiskGate": true
+  },
+  {
+    "name": "generate EOD readiness trend report",
+    "input": {
+      "region": "EMEA",
+      "dateRange": "2025-03-10/2025-03-15",
+      "action": "trendReport"
+    },
+    "expectedToolCalls": ["getHistoricalEodResults", "buildTrendReport"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "region": "EMEA",
+      "daysAnalyzed": 5,
+      "greenDays": 3,
+      "amberDays": 1,
+      "redDays": 1,
+      "recurringIssue": "RECONCILIATION_DELAYS"
+    },
+    "expectedRiskGate": false
+  }
+]

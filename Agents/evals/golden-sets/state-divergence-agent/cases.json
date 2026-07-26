@@ -1,0 +1,86 @@
+[
+  {
+    "name": "detect state divergence between services for a trade",
+    "input": {
+      "tradeId": "FX-000601",
+      "action": "checkDivergence"
+    },
+    "expectedToolCalls": ["getTradeStateFromLifecycle", "getTradeStateFromRisk", "getTradeStateFromSettlement", "compareSources"],
+    "expectedOutputContains": {
+      "status": "DIVERGENCE_DETECTED",
+      "tradeId": "FX-000601",
+      "sources": {
+        "trade-lifecycle": "SETTLED",
+        "risk-calculation": "RISK_CHECKED",
+        "settlement": "SETTLEMENT_INSTRUCTED"
+      },
+      "divergenceType": "STALE_STATE"
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "confirm state consistency across all services",
+    "input": {
+      "tradeId": "FX-000602",
+      "action": "checkDivergence"
+    },
+    "expectedToolCalls": ["getTradeStateFromLifecycle", "getTradeStateFromRisk", "getTradeStateFromSettlement", "compareSources"],
+    "expectedOutputContains": {
+      "status": "CONSISTENT",
+      "tradeId": "FX-000602",
+      "agreedState": "SETTLED"
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "bulk divergence scan for business date",
+    "input": {
+      "businessDate": "2025-03-15",
+      "region": "EMEA",
+      "action": "bulkScan"
+    },
+    "expectedToolCalls": ["getTradesForDate", "batchCompareStates", "buildDivergenceReport"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "totalTrades": 1247,
+      "consistentTrades": 1241,
+      "divergentTrades": 6,
+      "divergenceRate": 0.0048
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "propose state reconciliation for divergent trade",
+    "input": {
+      "tradeId": "FX-000601",
+      "action": "proposeReconciliation"
+    },
+    "expectedToolCalls": ["getTradeStateFromLifecycle", "getTradeEvents", "determineAuthoritative", "proposeCorrection"],
+    "expectedOutputContains": {
+      "status": "PENDING_APPROVAL",
+      "tradeId": "FX-000601",
+      "authoritativeSource": "trade-lifecycle",
+      "correctState": "SETTLED",
+      "servicesToUpdate": ["risk-calculation", "settlement"],
+      "requiresApproval": true
+    },
+    "expectedRiskGate": true
+  },
+  {
+    "name": "detect temporal divergence due to event lag",
+    "input": {
+      "tradeId": "FX-000603",
+      "action": "checkDivergence",
+      "toleranceMs": 5000
+    },
+    "expectedToolCalls": ["getTradeStateFromLifecycle", "getTradeStateFromRisk", "getTradeStateFromSettlement", "compareSources", "checkEventTimestamps"],
+    "expectedOutputContains": {
+      "status": "TEMPORAL_LAG",
+      "tradeId": "FX-000603",
+      "lagMs": 3200,
+      "withinTolerance": true,
+      "recommendation": "WAIT_FOR_CONVERGENCE"
+    },
+    "expectedRiskGate": false
+  }
+]

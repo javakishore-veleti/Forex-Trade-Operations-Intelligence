@@ -1,0 +1,80 @@
+[
+  {
+    "name": "reconstruct full trade lifecycle for stuck trade",
+    "input": {
+      "tradeId": "FX-000101",
+      "investigationReason": "Trade stuck in PENDING_CONFIRM for 2 hours"
+    },
+    "expectedToolCalls": ["getTrade", "getTradeEvents", "getTraceSpans", "buildTimeline"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "tradeId": "FX-000101",
+      "currentState": "PENDING_CONFIRM",
+      "rootCause": "MISSING_CONFIRMATION_ACK",
+      "permittedActions": ["resendConfirmation", "escalateToCounterparty"]
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "identify missing event in lifecycle sequence",
+    "input": {
+      "tradeId": "FX-000202",
+      "investigationReason": "Trade shows VALIDATED but never reached RISK_CHECKED"
+    },
+    "expectedToolCalls": ["getTrade", "getTradeEvents", "getExpectedSequence", "identifyGap"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "tradeId": "FX-000202",
+      "missingEvent": "RISK_CALCULATION_COMPLETED",
+      "lastKnownState": "VALIDATED",
+      "suggestedAction": "checkRiskCalculationService"
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "detect out-of-order event processing",
+    "input": {
+      "tradeId": "FX-000303",
+      "investigationReason": "Settlement attempted before risk check completed"
+    },
+    "expectedToolCalls": ["getTrade", "getTradeEvents", "buildTimeline", "detectSequenceViolation"],
+    "expectedOutputContains": {
+      "status": "SUCCESS",
+      "tradeId": "FX-000303",
+      "violation": "OUT_OF_ORDER",
+      "expected": ["RISK_CHECKED", "SETTLEMENT_INSTRUCTED"],
+      "actual": ["SETTLEMENT_INSTRUCTED", "RISK_CHECKED"]
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "require approval for trade state correction",
+    "input": {
+      "tradeId": "FX-000404",
+      "action": "forceStateTransition",
+      "targetState": "SETTLED"
+    },
+    "expectedToolCalls": ["getTrade", "getTradeEvents", "assessStateTransition", "proposeCorrection"],
+    "expectedOutputContains": {
+      "status": "PENDING_APPROVAL",
+      "tradeId": "FX-000404",
+      "proposedAction": "FORCE_STATE_TRANSITION",
+      "riskLevel": "HIGH"
+    },
+    "expectedRiskGate": true
+  },
+  {
+    "name": "handle non-existent trade gracefully",
+    "input": {
+      "tradeId": "FX-999999",
+      "investigationReason": "User reported missing trade"
+    },
+    "expectedToolCalls": ["getTrade"],
+    "expectedOutputContains": {
+      "status": "NOT_FOUND",
+      "tradeId": "FX-999999",
+      "message": "Trade not found in any system of record"
+    },
+    "expectedRiskGate": false
+  }
+]

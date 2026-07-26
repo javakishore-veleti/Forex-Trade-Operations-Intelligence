@@ -1,0 +1,76 @@
+[
+  {
+    "name": "route trade lifecycle query to specialized agent",
+    "input": {
+      "query": "What happened to trade FX-000101? It seems stuck in PENDING_CONFIRM.",
+      "userId": "ops-user-01",
+      "sessionId": "session-abc-001"
+    },
+    "expectedToolCalls": ["classifyIntent", "routeToAgent"],
+    "expectedOutputContains": {
+      "routedTo": "trade-lifecycle-agent",
+      "intent": "TRADE_INVESTIGATION",
+      "confidence": "HIGH"
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "route DLQ triage request to DLQ agent",
+    "input": {
+      "query": "There are 47 messages in the trade-ingest DLQ. Can you cluster them?",
+      "userId": "ops-user-02",
+      "sessionId": "session-abc-002"
+    },
+    "expectedToolCalls": ["classifyIntent", "routeToAgent"],
+    "expectedOutputContains": {
+      "routedTo": "dlq-triage-agent",
+      "intent": "DLQ_INVESTIGATION",
+      "confidence": "HIGH"
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "escalate ambiguous query with multi-agent plan",
+    "input": {
+      "query": "EOD is approaching and we have DLQ buildup plus canary failures. What is the overall status?",
+      "userId": "ops-user-03",
+      "sessionId": "session-abc-003"
+    },
+    "expectedToolCalls": ["classifyIntent", "buildMultiAgentPlan", "routeToAgent"],
+    "expectedOutputContains": {
+      "intent": "MULTI_AGENT_INVESTIGATION",
+      "agentPlan": ["canary-probe-agent", "dlq-triage-agent", "eod-readiness-agent"]
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "reject out-of-scope request gracefully",
+    "input": {
+      "query": "What is the weather in London?",
+      "userId": "ops-user-04",
+      "sessionId": "session-abc-004"
+    },
+    "expectedToolCalls": ["classifyIntent"],
+    "expectedOutputContains": {
+      "routedTo": null,
+      "intent": "OUT_OF_SCOPE"
+    },
+    "expectedRiskGate": false
+  },
+  {
+    "name": "require HITL approval for high-risk remediation routing",
+    "input": {
+      "query": "Replay all 200 DLQ messages from this morning trade-ingest failure",
+      "userId": "ops-user-01",
+      "sessionId": "session-abc-005"
+    },
+    "expectedToolCalls": ["classifyIntent", "assessRisk", "routeToAgent"],
+    "expectedOutputContains": {
+      "routedTo": "dlq-triage-agent",
+      "intent": "DLQ_REMEDIATION",
+      "riskLevel": "HIGH",
+      "requiresApproval": true
+    },
+    "expectedRiskGate": true
+  }
+]

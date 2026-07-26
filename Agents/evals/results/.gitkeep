@@ -1,0 +1,2 @@
+# Eval results (JSON) are stored here after running golden-set evals.
+# Historical results are git-tracked for comparison.
