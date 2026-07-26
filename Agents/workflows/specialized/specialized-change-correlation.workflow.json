@@ -1,0 +1,200 @@
+{
+  "name": "Specialized — Change Correlation (Deploy→Behavior Correlation)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "change-correlation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "chg-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "change-correlation"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8086/mcp/getRecentChanges",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ shiftOnset: $json.body.shiftOnset, correlationWindow: $json.body.correlationWindow || '2h', affectedScope: $json.body.affectedScope, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "chg-node-002",
+      "name": "Get Recent Changes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8086/mcp/correlateChangeToOutcome",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ changes: $('Get Recent Changes').item.json.changes, behaviorShift: $('Webhook Trigger').item.json.body.behaviorShift, metric: $('Webhook Trigger').item.json.body.metric, magnitude: $('Webhook Trigger').item.json.body.magnitude, affectedScope: $('Webhook Trigger').item.json.body.affectedScope, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "chg-node-003",
+      "name": "Correlate Change to Outcome",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8086/mcp/getChangeGraph",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ entity: $('Correlate Change to Outcome').item.json.topCorrelatedEntity || $('Correlate Change to Outcome').item.json.correlations[0]?.changeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "chg-node-004",
+      "name": "Get Change Graph",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8086/mcp/searchSimilarIncidents",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ behaviorShift: $('Webhook Trigger').item.json.body.behaviorShift, metric: $('Webhook Trigger').item.json.body.metric, affectedScope: $('Webhook Trigger').item.json.body.affectedScope, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "chg-node-005",
+      "name": "Similar Incident Retrieval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a change correlation analyst for an FX platform. Given: behavior shift details, recent changes (ranked by correlation score), dependency graph, and similar prior incidents — produce a causal hypothesis. Include: (1) most probable cause with confidence, (2) causal chain (change → service → metric), (3) alternative hypotheses, (4) reference to similar past incidents if found. Output: `rejection↑14:05 ← rule pkg 7.14 @14:01 → EUR/GBP +28% → book B17` style summary + detailed CorrelationReport JSON with fields: { probableCause, confidence, causalChain, alternativeHypotheses[], similarIncidents[], summary, recommendedAction }.",
+          "temperature": 0.2
+        },
+        "promptType": "define",
+        "text": "=Change correlation analysis request:\n\nBehavior Shift: {{ $('Webhook Trigger').item.json.body.behaviorShift }}\nMetric: {{ $('Webhook Trigger').item.json.body.metric }}\nOnset: {{ $('Webhook Trigger').item.json.body.shiftOnset }}\nMagnitude: {{ $('Webhook Trigger').item.json.body.magnitude }}\nAffected Scope: {{ JSON.stringify($('Webhook Trigger').item.json.body.affectedScope) }}\n\nRecent Changes:\n{{ JSON.stringify($('Get Recent Changes').item.json, null, 2) }}\n\nCorrelation Scores:\n{{ JSON.stringify($('Correlate Change to Outcome').item.json, null, 2) }}\n\nChange Dependency Graph:\n{{ JSON.stringify($('Get Change Graph').item.json, null, 2) }}\n\nSimilar Prior Incidents:\n{{ JSON.stringify($('Similar Incident Retrieval').item.json, null, 2) }}\n\nProduce a causal hypothesis with confidence level and chain."
+      },
+      "id": "chg-node-006",
+      "name": "Causal Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1420, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'completed', agent: 'change-correlation', correlationReport: $('Causal Analyzer').item.json.output, behaviorShift: $('Webhook Trigger').item.json.body.behaviorShift, metric: $('Webhook Trigger').item.json.body.metric, correlationId: $('Webhook Trigger').item.json.body.correlationId, completedAt: new Date().toISOString() }) }}"
+      },
+      "id": "chg-node-007",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1660, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Recent Changes", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Recent Changes": {
+      "main": [
+        [{ "node": "Correlate Change to Outcome", "type": "main", "index": 0 }]
+      ]
+    },
+    "Correlate Change to Outcome": {
+      "main": [
+        [{ "node": "Get Change Graph", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Change Graph": {
+      "main": [
+        [{ "node": "Similar Incident Retrieval", "type": "main", "index": 0 }]
+      ]
+    },
+    "Similar Incident Retrieval": {
+      "main": [
+        [{ "node": "Causal Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Causal Analyzer": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "change-correlation" },
+    { "name": "agent" },
+    { "name": "risk-L" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

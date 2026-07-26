@@ -1,0 +1,273 @@
+{
+  "name": "Specialized — Databricks Lineage & Freshness Impact (Aggregation Gate)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "databricks-lineage",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "lin-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "databricks-lineage"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/getJobStatus",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ jobId: $json.body.jobId, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "lin-node-002",
+      "name": "Get Job Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/getLineageDownstream",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ table: $('Webhook Trigger').item.json.body.table, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "lin-node-003",
+      "name": "Get Lineage Downstream",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/getAggregationReadiness",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "lin-node-004",
+      "name": "Get Aggregation Readiness",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a data lineage analyst for an FX platform. Given job status, downstream lineage graph, and aggregation readiness — explain the impact chain: source failure → intermediate tables → final reports/calcs. Include: affected regions, criticality, time-to-impact, and suggested remediation. Output as LineageImpactReport JSON with fields: { impactLevel, affectedTables[], downstreamReports[], criticality, timeToImpact, suggestedRemediation, blockRecommended }.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Lineage impact analysis request:\n\nEvent: {{ $('Webhook Trigger').item.json.body.eventType }}\nTable: {{ $('Webhook Trigger').item.json.body.table }}\nJob ID: {{ $('Webhook Trigger').item.json.body.jobId }}\nRegion: {{ $('Webhook Trigger').item.json.body.region }}\n\nJob Status:\n{{ JSON.stringify($('Get Job Status').item.json, null, 2) }}\n\nDownstream Lineage:\n{{ JSON.stringify($('Get Lineage Downstream').item.json, null, 2) }}\n\nAggregation Readiness:\n{{ JSON.stringify($('Get Aggregation Readiness').item.json, null, 2) }}\n\nExplain the impact chain and recommend whether to block downstream aggregation."
+      },
+      "id": "lin-node-005",
+      "name": "Impact Explainer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "blockRecommended",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "lin-node-006",
+      "name": "Block Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1420, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "lineage-block-approval",
+          "timeout": "1h"
+        }
+      },
+      "id": "lin-node-007",
+      "name": "Block Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1660, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "lin-node-008",
+      "name": "Block Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1900, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/blockAggregation",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $('Webhook Trigger').item.json.body.region, table: $('Webhook Trigger').item.json.body.table, reason: 'Pipeline failure impact - blocked by lineage agent', jobId: $('Webhook Trigger').item.json.body.jobId, approverUserId: $('Block Gate').item.json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId, blockedAt: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "M"
+            }
+          ]
+        }
+      },
+      "id": "lin-node-009",
+      "name": "Block Aggregation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2140, 60]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'completed', agent: 'databricks-lineage', impactReport: $('Impact Explainer').item.json.output, blocked: $('Block Check').item.json !== undefined, region: $('Webhook Trigger').item.json.body.region, table: $('Webhook Trigger').item.json.body.table, correlationId: $('Webhook Trigger').item.json.body.correlationId, completedAt: new Date().toISOString() }) }}"
+      },
+      "id": "lin-node-010",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2380, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Job Status", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Job Status": {
+      "main": [
+        [{ "node": "Get Lineage Downstream", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Lineage Downstream": {
+      "main": [
+        [{ "node": "Get Aggregation Readiness", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Aggregation Readiness": {
+      "main": [
+        [{ "node": "Impact Explainer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Impact Explainer": {
+      "main": [
+        [{ "node": "Block Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Block Check": {
+      "main": [
+        [{ "node": "Block Gate", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Block Gate": {
+      "main": [
+        [{ "node": "Block Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Block Handler": {
+      "main": [
+        [{ "node": "Block Aggregation", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Block Aggregation": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "databricks-lineage" },
+    { "name": "agent" },
+    { "name": "risk-M" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

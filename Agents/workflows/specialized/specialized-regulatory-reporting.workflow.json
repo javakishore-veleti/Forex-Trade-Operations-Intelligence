@@ -1,0 +1,304 @@
+{
+  "name": "Specialized — Regulatory Reporting Completeness (Gap Detection & Resubmission)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "regulatory-reporting",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "reg-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "regulatory-reporting"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/getReportableUniverse",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ regime: $json.body.regime, region: $json.body.region, deadline: $json.body.deadline, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "reg-node-002",
+      "name": "Get Reportable Universe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/getSubmittedReports",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ regime: $('Webhook Trigger').item.json.body.regime, region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "reg-node-003",
+      "name": "Get Submitted Reports",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/findReportingGaps",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ regime: $('Webhook Trigger').item.json.body.regime, region: $('Webhook Trigger').item.json.body.region, reportableUniverse: $('Get Reportable Universe').item.json, submittedReports: $('Get Submitted Reports').item.json, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "reg-node-004",
+      "name": "Find Gaps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/getFieldValidationFailures",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ regime: $('Webhook Trigger').item.json.body.regime, region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "reg-node-005",
+      "name": "Get Validation Failures",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a regulatory reporting analyst. Given: reportable universe, submitted reports, gaps, and validation failures — explain each gap (late capture, validation failure, system error, exclusion). Identify systemic patterns (branch-level, feed-level). Categorize by priority (deadline proximity, materiality). Output as CompletenessReport JSON with fields: { completionPct, gaps[], patterns[], validationIssues[], correctableGaps[], attestationReady, summary }.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Regulatory reporting completeness analysis:\n\nRegime: {{ $('Webhook Trigger').item.json.body.regime }}\nRegion: {{ $('Webhook Trigger').item.json.body.region }}\nDeadline: {{ $('Webhook Trigger').item.json.body.deadline }}\n\nReportable Universe:\n{{ JSON.stringify($('Get Reportable Universe').item.json, null, 2) }}\n\nSubmitted Reports:\n{{ JSON.stringify($('Get Submitted Reports').item.json, null, 2) }}\n\nReporting Gaps:\n{{ JSON.stringify($('Find Gaps').item.json, null, 2) }}\n\nValidation Failures:\n{{ JSON.stringify($('Get Validation Failures').item.json, null, 2) }}\n\nExplain each gap, identify systemic patterns, and assess if resubmission can resolve them before deadline."
+      },
+      "id": "reg-node-006",
+      "name": "Gap Explainer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "correctableGaps",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "reg-node-007",
+      "name": "Gaps Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1660, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "reporting-resubmit",
+          "timeout": "2h"
+        }
+      },
+      "id": "reg-node-008",
+      "name": "Resubmit Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1900, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "reg-node-009",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2140, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/resubmitReport",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ regime: $('Webhook Trigger').item.json.body.regime, region: $('Webhook Trigger').item.json.body.region, tradeIds: $('Resubmit Gate').item.json.body.tradeIds || [], approverUserId: $('Resubmit Gate').item.json.body.approverUserId, completenessReport: $('Gap Explainer').item.json.output, correlationId: $('Webhook Trigger').item.json.body.correlationId, resubmittedAt: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "M"
+            }
+          ]
+        }
+      },
+      "id": "reg-node-010",
+      "name": "Resubmit Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2380, 60]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'completed', agent: 'regulatory-reporting', completenessReport: $('Gap Explainer').item.json.output, gapsFound: true, regime: $('Webhook Trigger').item.json.body.regime, region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId, completedAt: new Date().toISOString() }) }}"
+      },
+      "id": "reg-node-011",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2620, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Reportable Universe", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Reportable Universe": {
+      "main": [
+        [{ "node": "Get Submitted Reports", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Submitted Reports": {
+      "main": [
+        [{ "node": "Find Gaps", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Gaps": {
+      "main": [
+        [{ "node": "Get Validation Failures", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Validation Failures": {
+      "main": [
+        [{ "node": "Gap Explainer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gap Explainer": {
+      "main": [
+        [{ "node": "Gaps Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gaps Check": {
+      "main": [
+        [{ "node": "Resubmit Gate", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Resubmit Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Resubmit Report", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Resubmit Report": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "regulatory-reporting" },
+    { "name": "agent" },
+    { "name": "risk-M" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

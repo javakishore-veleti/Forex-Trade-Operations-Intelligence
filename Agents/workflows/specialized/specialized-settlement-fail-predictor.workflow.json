@@ -1,0 +1,320 @@
+{
+  "name": "Specialized — Settlement Fail Predictor (Pre-Settlement Sweep)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "settlement-fail-predictor",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "sett-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "settlement-fail-predictor"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getApproachingSettlements",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ window: $json.body.window || 'T-1', region: $json.body.region || 'GLOBAL', correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "sett-node-002",
+      "name": "Get Approaching Settlements",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "sett-node-003",
+      "name": "Loop Trades",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getMissingSSI",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $json.tradeId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "sett-node-004",
+      "name": "Check Missing SSI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8082/mcp/getNostroShortfall",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ currency: $json.settlementCurrency, tradeId: $json.tradeId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "sett-node-005",
+      "name": "Check Nostro Shortfall",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8082/mcp/predictFailProbability",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $json.tradeId, ssiStatus: $('Check Missing SSI').item.json.ssiStatus, nostroShortfall: $('Check Nostro Shortfall').item.json.shortfallAmount, counterpartyId: $json.counterpartyId, amount: $json.amount, currency: $json.settlementCurrency }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "sett-node-006",
+      "name": "Predict Fail Probability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1420, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a settlement risk analyst. Given trades with fail probabilities, SSI status, and nostro data — produce a prioritized risk report. Rank by: probability, amount, deadline proximity. Group by reason type (missing SSI, nostro shortfall, counterparty history). Identify clusters (e.g., 'all JPY trades for FX-CP-003'). Never invent data. Output as EscalationPackage JSON with fields: { riskLevel, rankedTrades[], clusters[], summary, recommendedAction }.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Settlement risk analysis request:\n\nTrades approaching settlement:\n{{ JSON.stringify($('Loop Trades').all().map(item => item.json), null, 2) }}\n\nSSI check results:\n{{ JSON.stringify($('Check Missing SSI').all().map(item => item.json), null, 2) }}\n\nNostro shortfall results:\n{{ JSON.stringify($('Check Nostro Shortfall').all().map(item => item.json), null, 2) }}\n\nFail probability predictions:\n{{ JSON.stringify($('Predict Fail Probability').all().map(item => item.json), null, 2) }}\n\nProduce a prioritized EscalationPackage JSON ranking all at-risk trades."
+      },
+      "id": "sett-node-007",
+      "name": "Risk Ranker & Explainer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1660, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "0.7",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "sett-node-008",
+      "name": "High-Risk Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1900, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "settlement-escalation",
+          "timeout": "4h"
+        }
+      },
+      "id": "sett-node-009",
+      "name": "Escalation Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2140, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "sett-node-010",
+      "name": "Escalation Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2380, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8082/mcp/escalateSettlementRisk",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeIds: $('Escalation Gate').item.json.body.tradeIds || [], escalationPackage: $('Risk Ranker & Explainer').item.json.output, approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId, escalatedAt: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "H"
+            }
+          ]
+        }
+      },
+      "id": "sett-node-011",
+      "name": "Escalate Risk",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2620, 60]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'completed', agent: 'settlement-fail-predictor', riskReport: $('Risk Ranker & Explainer').item.json.output, escalated: $('High-Risk Check').item.json !== undefined, correlationId: $('Webhook Trigger').item.json.body.correlationId, completedAt: new Date().toISOString() }) }}"
+      },
+      "id": "sett-node-012",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2860, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Approaching Settlements", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Approaching Settlements": {
+      "main": [
+        [{ "node": "Loop Trades", "type": "main", "index": 0 }]
+      ]
+    },
+    "Loop Trades": {
+      "main": [
+        [{ "node": "Check Missing SSI", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Missing SSI": {
+      "main": [
+        [{ "node": "Check Nostro Shortfall", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Nostro Shortfall": {
+      "main": [
+        [{ "node": "Predict Fail Probability", "type": "main", "index": 0 }]
+      ]
+    },
+    "Predict Fail Probability": {
+      "main": [
+        [{ "node": "Loop Trades", "type": "main", "index": 0 }]
+      ]
+    },
+    "Risk Ranker & Explainer": {
+      "main": [
+        [{ "node": "High-Risk Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "High-Risk Check": {
+      "main": [
+        [{ "node": "Escalation Gate", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Escalation Gate": {
+      "main": [
+        [{ "node": "Escalation Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Escalation Handler": {
+      "main": [
+        [{ "node": "Escalate Risk", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Escalate Risk": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "settlement-fail-predictor" },
+    { "name": "agent" },
+    { "name": "risk-H" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

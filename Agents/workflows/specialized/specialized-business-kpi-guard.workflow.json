@@ -1,0 +1,169 @@
+{
+  "name": "Specialized — Business KPI Guard (Sidecar-Triggered Anomaly Analysis)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "business-kpi-guard",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "kpi-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "business-kpi-guard"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8082/mcp/getBusinessKpis",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $json.body.region, kpi: $json.body.kpi, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "kpi-node-002",
+      "name": "Get Business KPIs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8082/mcp/getSeasonalBaseline",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ kpi: $('Webhook Trigger').item.json.body.kpi, region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "kpi-node-003",
+      "name": "Get Seasonal Baseline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8082/mcp/getRejectBreakdown",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "kpi-node-004",
+      "name": "Get Reject Breakdown",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a business KPI analyst for an FX platform. Given: anomaly envelope, current KPIs, seasonal baseline, reject breakdown, and calendar context — determine: (1) Is this a real anomaly or calendar-driven? (2) What is the affected scope (region/book/pair)? (3) What is the probable root cause? (4) Should Change Correlation Agent be invoked? Never invent data. Output as KPIAnomalyReport JSON with fields: { confirmed, scope, probableCause, calendarDriven, deviationSeverity, suggestedAction, invokeChangeCorrelation }.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Business KPI anomaly analysis:\n\nAnomaly Envelope (from sidecar):\n- KPI: {{ $('Webhook Trigger').item.json.body.kpi }}\n- Region: {{ $('Webhook Trigger').item.json.body.region }}\n- Current Value: {{ $('Webhook Trigger').item.json.body.currentValue }}\n- Baseline Value: {{ $('Webhook Trigger').item.json.body.baselineValue }}\n- Deviation: {{ $('Webhook Trigger').item.json.body.deviationPct }}%\n- Detected At: {{ $('Webhook Trigger').item.json.body.detectedAt }}\n- Calendar Context: {{ JSON.stringify($('Webhook Trigger').item.json.body.calendarContext) }}\n\nCurrent Business KPIs:\n{{ JSON.stringify($('Get Business KPIs').item.json, null, 2) }}\n\nSeasonal Baseline:\n{{ JSON.stringify($('Get Seasonal Baseline').item.json, null, 2) }}\n\nReject Breakdown:\n{{ JSON.stringify($('Get Reject Breakdown').item.json, null, 2) }}\n\nDetermine if this is a confirmed anomaly, its root cause, and recommended action."
+      },
+      "id": "kpi-node-005",
+      "name": "Root Cause Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'completed', agent: 'business-kpi-guard', anomalyReport: $('Root Cause Analyzer').item.json.output, kpi: $('Webhook Trigger').item.json.body.kpi, region: $('Webhook Trigger').item.json.body.region, deviationPct: $('Webhook Trigger').item.json.body.deviationPct, correlationId: $('Webhook Trigger').item.json.body.correlationId, completedAt: new Date().toISOString() }) }}"
+      },
+      "id": "kpi-node-006",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1420, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Business KPIs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Business KPIs": {
+      "main": [
+        [{ "node": "Get Seasonal Baseline", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Seasonal Baseline": {
+      "main": [
+        [{ "node": "Get Reject Breakdown", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Reject Breakdown": {
+      "main": [
+        [{ "node": "Root Cause Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Root Cause Analyzer": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "business-kpi-guard" },
+    { "name": "agent" },
+    { "name": "risk-L" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}
