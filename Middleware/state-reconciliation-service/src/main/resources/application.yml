@@ -1,6 +1,59 @@
 spring:
   application:
     name: state-reconciliation-service
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fxtradeops
+    username: fxtradeops
+    password: fxtradeops
+    hikari:
+      read-only: true
+      maximum-pool-size: 5
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: public
+
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/fxtradeops
+    redis:
+      host: localhost
+      port: 6379
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: state-reconciliation-readonly
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+server:
+  port: 8087
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      group:
+        readiness:
+          include: degradedReadiness
+
+logging:
+  pattern:
+    console: "%d{ISO8601} [%thread] %-5level %logger{36} [%X{correlationId}] - %msg%n"
+
+# Optional analytics platform source
+reconciliation:
+  sources:
+    analytics:
+      enabled: false
+      endpoint: ""
