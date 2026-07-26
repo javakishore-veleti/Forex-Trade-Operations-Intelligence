@@ -1,0 +1,85 @@
+# =============================================================================
+# FXOps — trade-ingest-service Helm Values
+# Ingests FX trade requests, validates, publishes to Kafka
+# =============================================================================
+
+replicaCount: 3
+
+image:
+  repository: "123456789012.dkr.ecr.us-east-1.amazonaws.com/fxops/trade-ingest-service"
+  tag: "latest"
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/fxops-trade-ingest-dev"
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2000m"
+    memory: "2Gi"
+
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 65
+
+env:
+  # --- Database (RDS via Proxy) ---
+  - name: SPRING_DATASOURCE_URL
+    value: "jdbc:postgresql://${RDS_PROXY_ENDPOINT}:5432/fxops?sslmode=require&sslrootcert=/etc/ssl/rds-ca.pem"
+  - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+    value: "10"
+  - name: SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT
+    value: "5000"
+  # --- Kafka (MSK) ---
+  - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+    value: "${MSK_BOOTSTRAP_BROKERS}:9098"
+  - name: SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL
+    value: "SASL_SSL"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_MECHANISM
+    value: "AWS_MSK_IAM"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
+    value: "software.amazon.msk.auth.iam.IAMLoginModule required;"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_CLIENT_CALLBACK_HANDLER_CLASS
+    value: "software.amazon.msk.auth.iam.IAMClientCallbackHandler"
+  # --- Redis (ElastiCache) ---
+  - name: SPRING_DATA_REDIS_CLUSTER_NODES
+    value: "${ELASTICACHE_CONFIG_ENDPOINT}:6379"
+  - name: SPRING_DATA_REDIS_SSL_ENABLED
+    value: "true"
+  - name: SPRING_DATA_REDIS_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: fxops-redis-auth
+        key: auth-token
+  # --- OTel ---
+  - name: OTEL_SERVICE_NAME
+    value: "trade-ingest-service"
+
+# --- Init Container: Flyway Migration ---
+initContainers:
+  - name: flyway-migrate
+    image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/fxops/flyway:10"
+    command: ["flyway", "migrate"]
+    env:
+      - name: FLYWAY_URL
+        value: "jdbc:postgresql://${RDS_PROXY_ENDPOINT}:5432/fxops?sslmode=require"
+      - name: FLYWAY_BASELINE_ON_MIGRATE
+        value: "true"
+      - name: FLYWAY_SCHEMAS
+        value: "trade_ingest"
+
+# --- Volume Mounts (TLS certs) ---
+volumeMounts:
+  - name: rds-ca-cert
+    mountPath: /etc/ssl/rds-ca.pem
+    subPath: rds-ca.pem
+    readOnly: true
+
+volumes:
+  - name: rds-ca-cert
+    configMap:
+      name: rds-ca-bundle

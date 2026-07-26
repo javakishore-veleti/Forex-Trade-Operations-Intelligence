@@ -1,0 +1,54 @@
+# =============================================================================
+# FXOps Platform — Example Terraform Variables (SYNTHETIC DATA ONLY)
+# Copy to terraform.tfvars and adjust for your environment.
+# All identifiers use FX- prefix. Account ID is a placeholder.
+# =============================================================================
+
+# --- General ---
+aws_region  = "us-east-1"
+environment = "dev"
+vpc_cidr    = "10.0.0.0/16"
+
+# --- EKS ---
+cluster_name        = "fxops"
+eks_cluster_version = "1.30"
+services_node_min   = 2
+services_node_max   = 6
+agents_node_min     = 1
+agents_node_max     = 2
+
+# --- RDS PostgreSQL ---
+rds_instance_class = "db.t4g.medium"   # prod: db.r7g.xlarge
+rds_multi_az       = false              # prod: true
+rds_storage_type   = "gp3"             # prod: io2
+
+# --- MSK Kafka ---
+msk_instance_type = "kafka.t3.small"   # prod: kafka.m7g.large
+msk_broker_count  = 2                   # prod: 3
+
+# --- ElastiCache Redis ---
+redis_node_type          = "cache.t4g.micro"  # prod: cache.r7g.large
+redis_num_node_groups    = 1                   # prod: 2
+redis_replicas_per_group = 0                   # prod: 1
+
+# --- DocumentDB ---
+docdb_instance_class = "db.t4g.medium"  # prod: db.r6g.large
+docdb_replica_count  = 0                 # prod: 1
+
+# --- Neptune ---
+neptune_instance_class = "db.t4g.medium"  # prod: db.r6g.large
+neptune_replica_count  = 0                 # prod: 1
+
+# --- OpenSearch ---
+opensearch_instance_type   = "t3.medium.search"  # prod: r6g.large.search
+opensearch_instance_count  = 1                    # prod: 2
+opensearch_ebs_volume_size = 50                   # prod: 500
+
+# --- Domain (placeholder) ---
+domain_name = "fxops.example.com"
+
+# =============================================================================
+# NOTE: Credentials are NEVER stored in tfvars.
+# All secrets auto-generated and stored in AWS Secrets Manager.
+# Account ID: 123456789012 (placeholder — replace with actual)
+# =============================================================================

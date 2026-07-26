@@ -1,0 +1,89 @@
+# =============================================================================
+# FXOps — risk-calculation-service Helm Values
+# Deterministic risk engine — computes exposure, limits, aggregations
+# =============================================================================
+
+replicaCount: 3
+
+image:
+  repository: "123456789012.dkr.ecr.us-east-1.amazonaws.com/fxops/risk-calculation-service"
+  tag: "latest"
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/fxops-risk-calculation-dev"
+
+resources:
+  requests:
+    cpu: "1000m"
+    memory: "2Gi"
+  limits:
+    cpu: "3000m"
+    memory: "4Gi"
+
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 12
+  targetCPUUtilizationPercentage: 60
+
+env:
+  # --- Database (RDS via Proxy) ---
+  - name: SPRING_DATASOURCE_URL
+    value: "jdbc:postgresql://${RDS_PROXY_ENDPOINT}:5432/fxops?sslmode=require&sslrootcert=/etc/ssl/rds-ca.pem"
+  - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+    value: "15"
+  # --- Kafka (MSK) ---
+  - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+    value: "${MSK_BOOTSTRAP_BROKERS}:9098"
+  - name: SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL
+    value: "SASL_SSL"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_MECHANISM
+    value: "AWS_MSK_IAM"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
+    value: "software.amazon.msk.auth.iam.IAMLoginModule required;"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_CLIENT_CALLBACK_HANDLER_CLASS
+    value: "software.amazon.msk.auth.iam.IAMClientCallbackHandler"
+  # --- Redis (ElastiCache) - risk context cache ---
+  - name: SPRING_DATA_REDIS_CLUSTER_NODES
+    value: "${ELASTICACHE_CONFIG_ENDPOINT}:6379"
+  - name: SPRING_DATA_REDIS_SSL_ENABLED
+    value: "true"
+  - name: SPRING_DATA_REDIS_LETTUCE_POOL_MAX_ACTIVE
+    value: "16"
+  - name: SPRING_DATA_REDIS_LETTUCE_POOL_MAX_IDLE
+    value: "8"
+  - name: SPRING_DATA_REDIS_LETTUCE_POOL_MIN_IDLE
+    value: "2"
+  - name: SPRING_DATA_REDIS_TIMEOUT
+    value: "2000ms"
+  - name: SPRING_DATA_REDIS_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: fxops-redis-auth
+        key: auth-token
+  # --- OTel ---
+  - name: OTEL_SERVICE_NAME
+    value: "risk-calculation-service"
+
+initContainers:
+  - name: flyway-migrate
+    image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/fxops/flyway:10"
+    command: ["flyway", "migrate"]
+    env:
+      - name: FLYWAY_URL
+        value: "jdbc:postgresql://${RDS_PROXY_ENDPOINT}:5432/fxops?sslmode=require"
+      - name: FLYWAY_BASELINE_ON_MIGRATE
+        value: "true"
+      - name: FLYWAY_SCHEMAS
+        value: "risk_calculation"
+
+volumeMounts:
+  - name: rds-ca-cert
+    mountPath: /etc/ssl/rds-ca.pem
+    subPath: rds-ca.pem
+    readOnly: true
+
+volumes:
+  - name: rds-ca-cert
+    configMap:
+      name: rds-ca-bundle

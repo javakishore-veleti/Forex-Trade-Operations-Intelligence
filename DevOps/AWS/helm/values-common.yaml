@@ -1,0 +1,103 @@
+# =============================================================================
+# FXOps Platform — Common Helm Values (shared across all services)
+# Override per-service in individual values.yaml files
+# =============================================================================
+
+# --- Image Defaults ---
+image:
+  registry: "123456789012.dkr.ecr.us-east-1.amazonaws.com"
+  pullPolicy: IfNotPresent
+
+# --- Service Account (IRSA) ---
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: ""  # Override per service
+
+# --- Namespace ---
+namespace: fxops-services
+
+# --- Resource Defaults ---
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1536Mi"
+
+# --- Health Probes ---
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8080
+  initialDelaySeconds: 15
+  periodSeconds: 5
+  failureThreshold: 3
+
+# --- HPA ---
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+
+# --- OTel Agent (sidecar) ---
+otel:
+  enabled: true
+  image: "amazon/aws-otel-collector:v0.40.0"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  env:
+    - name: AWS_REGION
+      value: "us-east-1"
+
+# --- Spring Boot Common Env ---
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: "aws"
+  - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+    value: "health,info,prometheus,metrics"
+  - name: MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED
+    value: "true"
+  - name: OTEL_SERVICE_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.labels['app']
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: "http://localhost:4317"
+
+# --- Node Selector / Tolerations ---
+nodeSelector:
+  workload: services
+
+tolerations: []
+
+# --- Pod Disruption Budget ---
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# --- Ingress ---
+ingress:
+  enabled: false
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06

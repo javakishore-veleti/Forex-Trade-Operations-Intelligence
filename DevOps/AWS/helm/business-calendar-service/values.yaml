@@ -1,0 +1,80 @@
+# =============================================================================
+# FXOps — business-calendar-service Helm Values
+# Holiday and settlement date calculations, heavily cached
+# =============================================================================
+
+replicaCount: 2
+
+image:
+  repository: "123456789012.dkr.ecr.us-east-1.amazonaws.com/fxops/business-calendar-service"
+  tag: "latest"
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/fxops-business-calendar-dev"
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+env:
+  # --- Database (RDS via Proxy) ---
+  - name: SPRING_DATASOURCE_URL
+    value: "jdbc:postgresql://${RDS_PROXY_ENDPOINT}:5432/fxops?sslmode=require&sslrootcert=/etc/ssl/rds-ca.pem"
+  - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+    value: "5"
+  # --- Redis (ElastiCache) - calendar cache (12h TTL) ---
+  - name: SPRING_DATA_REDIS_CLUSTER_NODES
+    value: "${ELASTICACHE_CONFIG_ENDPOINT}:6379"
+  - name: SPRING_DATA_REDIS_SSL_ENABLED
+    value: "true"
+  - name: SPRING_DATA_REDIS_LETTUCE_POOL_MAX_ACTIVE
+    value: "16"
+  - name: SPRING_DATA_REDIS_LETTUCE_POOL_MAX_IDLE
+    value: "8"
+  - name: SPRING_DATA_REDIS_LETTUCE_POOL_MIN_IDLE
+    value: "2"
+  - name: SPRING_DATA_REDIS_TIMEOUT
+    value: "2000ms"
+  - name: SPRING_DATA_REDIS_CONNECT_TIMEOUT
+    value: "2000ms"
+  - name: SPRING_DATA_REDIS_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: fxops-redis-auth
+        key: auth-token
+  # --- OTel ---
+  - name: OTEL_SERVICE_NAME
+    value: "business-calendar-service"
+
+initContainers:
+  - name: flyway-migrate
+    image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/fxops/flyway:10"
+    command: ["flyway", "migrate"]
+    env:
+      - name: FLYWAY_URL
+        value: "jdbc:postgresql://${RDS_PROXY_ENDPOINT}:5432/fxops?sslmode=require"
+      - name: FLYWAY_BASELINE_ON_MIGRATE
+        value: "true"
+      - name: FLYWAY_SCHEMAS
+        value: "business_calendar"
+
+volumeMounts:
+  - name: rds-ca-cert
+    mountPath: /etc/ssl/rds-ca.pem
+    subPath: rds-ca.pem
+    readOnly: true
+
+volumes:
+  - name: rds-ca-cert
+    configMap:
+      name: rds-ca-bundle

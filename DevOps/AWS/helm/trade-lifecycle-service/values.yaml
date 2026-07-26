@@ -1,0 +1,84 @@
+# =============================================================================
+# FXOps — trade-lifecycle-service Helm Values
+# Manages trade state transitions, audit history in DocumentDB
+# =============================================================================
+
+replicaCount: 2
+
+image:
+  repository: "123456789012.dkr.ecr.us-east-1.amazonaws.com/fxops/trade-lifecycle-service"
+  tag: "latest"
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/fxops-trade-lifecycle-dev"
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "1500m"
+    memory: "2Gi"
+
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+env:
+  # --- Database (RDS via Proxy) ---
+  - name: SPRING_DATASOURCE_URL
+    value: "jdbc:postgresql://${RDS_PROXY_ENDPOINT}:5432/fxops?sslmode=require&sslrootcert=/etc/ssl/rds-ca.pem"
+  - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+    value: "10"
+  # --- Kafka (MSK) ---
+  - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+    value: "${MSK_BOOTSTRAP_BROKERS}:9098"
+  - name: SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL
+    value: "SASL_SSL"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_MECHANISM
+    value: "AWS_MSK_IAM"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
+    value: "software.amazon.msk.auth.iam.IAMLoginModule required;"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_CLIENT_CALLBACK_HANDLER_CLASS
+    value: "software.amazon.msk.auth.iam.IAMClientCallbackHandler"
+  # --- DocumentDB ---
+  - name: SPRING_DATA_MONGODB_URI
+    value: "mongodb://${DOCDB_USER}:${DOCDB_PASSWORD}@${DOCDB_CLUSTER_ENDPOINT}:27017/fxops?tls=true&tlsCAFile=/etc/ssl/rds-combined-ca-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
+  # --- Redis (ElastiCache) ---
+  - name: SPRING_DATA_REDIS_CLUSTER_NODES
+    value: "${ELASTICACHE_CONFIG_ENDPOINT}:6379"
+  - name: SPRING_DATA_REDIS_SSL_ENABLED
+    value: "true"
+  - name: SPRING_DATA_REDIS_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: fxops-redis-auth
+        key: auth-token
+  # --- OTel ---
+  - name: OTEL_SERVICE_NAME
+    value: "trade-lifecycle-service"
+
+initContainers:
+  - name: flyway-migrate
+    image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/fxops/flyway:10"
+    command: ["flyway", "migrate"]
+    env:
+      - name: FLYWAY_URL
+        value: "jdbc:postgresql://${RDS_PROXY_ENDPOINT}:5432/fxops?sslmode=require"
+      - name: FLYWAY_BASELINE_ON_MIGRATE
+        value: "true"
+      - name: FLYWAY_SCHEMAS
+        value: "trade_lifecycle"
+
+volumeMounts:
+  - name: ca-certs
+    mountPath: /etc/ssl/rds-combined-ca-bundle.pem
+    subPath: rds-combined-ca-bundle.pem
+    readOnly: true
+
+volumes:
+  - name: ca-certs
+    configMap:
+      name: aws-ca-bundle

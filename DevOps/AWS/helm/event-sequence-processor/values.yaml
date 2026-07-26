@@ -1,0 +1,82 @@
+# =============================================================================
+# FXOps — event-sequence-processor Helm Values
+# Kafka Streams processor - event ordering, deduplication, DLQ routing
+# =============================================================================
+
+replicaCount: 3
+
+image:
+  repository: "123456789012.dkr.ecr.us-east-1.amazonaws.com/fxops/event-sequence-processor"
+  tag: "latest"
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/fxops-event-sequence-dev"
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2000m"
+    memory: "3Gi"
+
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 9
+  targetCPUUtilizationPercentage: 65
+
+env:
+  # --- Kafka Streams (MSK) ---
+  - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+    value: "${MSK_BOOTSTRAP_BROKERS}:9098"
+  - name: SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL
+    value: "SASL_SSL"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_MECHANISM
+    value: "AWS_MSK_IAM"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
+    value: "software.amazon.msk.auth.iam.IAMLoginModule required;"
+  - name: SPRING_KAFKA_PROPERTIES_SASL_CLIENT_CALLBACK_HANDLER_CLASS
+    value: "software.amazon.msk.auth.iam.IAMClientCallbackHandler"
+  - name: SPRING_KAFKA_STREAMS_APPLICATION_ID
+    value: "fxops-event-sequence-processor"
+  - name: SPRING_KAFKA_STREAMS_PROPERTIES_NUM_STREAM_THREADS
+    value: "2"
+  - name: SPRING_KAFKA_STREAMS_STATE_DIR
+    value: "/tmp/kafka-streams"
+  # --- OTel ---
+  - name: OTEL_SERVICE_NAME
+    value: "event-sequence-processor"
+
+# --- Health probes for Kafka Streams ---
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8080
+  initialDelaySeconds: 45
+  periodSeconds: 15
+  failureThreshold: 5
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+
+# --- Persistent volume for Kafka Streams state store ---
+persistence:
+  enabled: true
+  storageClass: gp3
+  size: 10Gi
+  mountPath: /tmp/kafka-streams
+
+volumeMounts:
+  - name: kafka-streams-state
+    mountPath: /tmp/kafka-streams
+
+volumes:
+  - name: kafka-streams-state
+    persistentVolumeClaim:
+      claimName: event-sequence-state

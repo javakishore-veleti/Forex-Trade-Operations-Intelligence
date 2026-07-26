@@ -1,0 +1,122 @@
+# =============================================================================
+# FXOps — n8n Agent Platform Helm Values
+# Workflow automation for AI agents (supervisor, lifecycle, canary, DLQ triage)
+# =============================================================================
+
+replicaCount: 1
+
+image:
+  repository: "123456789012.dkr.ecr.us-east-1.amazonaws.com/fxops/n8n"
+  tag: "1.50.0"
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/fxops-n8n-agents-dev"
+
+namespace: fxops-agents
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2000m"
+    memory: "4Gi"
+
+nodeSelector:
+  workload: agents
+
+# --- n8n Environment ---
+env:
+  - name: N8N_PORT
+    value: "5678"
+  - name: N8N_PROTOCOL
+    value: "https"
+  - name: N8N_HOST
+    value: "agents.fxops.example.com"
+  - name: WEBHOOK_URL
+    value: "https://agents.fxops.example.com/"
+  - name: N8N_ENCRYPTION_KEY
+    valueFrom:
+      secretKeyRef:
+        name: fxops-n8n-secrets
+        key: encryption-key
+  # --- Database (PostgreSQL via RDS Proxy) ---
+  - name: DB_TYPE
+    value: "postgresdb"
+  - name: DB_POSTGRESDB_HOST
+    value: "${RDS_PROXY_ENDPOINT}"
+  - name: DB_POSTGRESDB_PORT
+    value: "5432"
+  - name: DB_POSTGRESDB_DATABASE
+    value: "fxops_n8n"
+  - name: DB_POSTGRESDB_SSL_ENABLED
+    value: "true"
+  - name: DB_POSTGRESDB_SSL_CA
+    value: "/etc/ssl/rds-ca.pem"
+  - name: DB_POSTGRESDB_USER
+    valueFrom:
+      secretKeyRef:
+        name: fxops-n8n-secrets
+        key: db-user
+  - name: DB_POSTGRESDB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: fxops-n8n-secrets
+        key: db-password
+  # --- Executions ---
+  - name: EXECUTIONS_MODE
+    value: "queue"
+  - name: QUEUE_BULL_REDIS_HOST
+    value: "${ELASTICACHE_CONFIG_ENDPOINT}"
+  - name: QUEUE_BULL_REDIS_PORT
+    value: "6379"
+  - name: QUEUE_BULL_REDIS_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: fxops-redis-auth
+        key: auth-token
+  - name: QUEUE_BULL_REDIS_TLS
+    value: "true"
+  # --- OTel ---
+  - name: OTEL_SERVICE_NAME
+    value: "n8n-agents"
+
+# --- Health Probes ---
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 5678
+  initialDelaySeconds: 30
+  periodSeconds: 15
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: 5678
+  initialDelaySeconds: 15
+  periodSeconds: 10
+
+# --- Service ---
+service:
+  type: ClusterIP
+  port: 5678
+
+# --- Persistence ---
+persistence:
+  enabled: true
+  storageClass: gp3
+  size: 10Gi
+  mountPath: /home/node/.n8n
+
+# --- Volume Mounts (TLS) ---
+volumeMounts:
+  - name: rds-ca-cert
+    mountPath: /etc/ssl/rds-ca.pem
+    subPath: rds-ca.pem
+    readOnly: true
+
+volumes:
+  - name: rds-ca-cert
+    configMap:
+      name: rds-ca-bundle
