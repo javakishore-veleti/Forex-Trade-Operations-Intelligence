@@ -1,0 +1,25 @@
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: fxops-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: fxops
+      MONGO_INITDB_ROOT_PASSWORD: fxops_local_dev
+    ports:
+      - "27017:27017"
+    volumes:
+      - fxops-mongo-data:/data/db
+    networks:
+      - fxops-document-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  fxops-mongo-data:
+
+networks:
+  fxops-document-net:
+    driver: bridge

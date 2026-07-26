@@ -1,0 +1,5 @@
+# Specialized Agent Workflows
+
+This directory contains n8n workflow JSON exports for specialized agents (e.g., risk analysis, trade validation, settlement).
+
+Workflows will be added in later phases.

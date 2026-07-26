@@ -1,0 +1,5 @@
+# Utility Agent Workflows
+
+This directory contains n8n workflow JSON exports for utility agents (e.g., notification, scheduling, data sync).
+
+Workflows will be added in later phases.

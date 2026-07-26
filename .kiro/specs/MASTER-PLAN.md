@@ -159,7 +159,7 @@ Forex-Trade-Operations-Intelligence/
 | Spec | Status | Scope |
 |---|---|---|
 | `01-initial-setup/01-technology-stack` | ✅ Requirements done | **Single source of truth** for all technologies + versions. Defines Technology Roles (`RELATIONAL_STORE`, `DOCUMENT_STORE`, `CACHE`, `GRAPH_STORE`, `EVENT_STREAM`, `RULES_ENGINE`, `SERVICE_LANGUAGE`, `AGENT_PLATFORM`, `AGENT_TOOL_PROTOCOL`, cloud target bindings, etc.). Every other spec references these roles and stays product/version agnostic. |
-| `01-initial-setup/02-repo-skeleton` | ✅ Requirements done ⚠️ needs agnostic rewrite | Repo skeleton, all top-level folders, service/portal/sidecar scaffolds, DevOps/Local compose (9 services), orchestration scripts, root package.json, tooling files, docs/adr. (Currently names products/versions — to be refactored to reference Technology Roles.) |
+| `01-initial-setup/02-repo-skeleton` | ✅ Requirements + Design + Tasks done | Repo skeleton, all top-level folders, service/portal/sidecar scaffolds, DevOps/Local compose (9 services), orchestration scripts, root package.json, tooling files, docs/adr. |
 
 ---
 
@@ -347,7 +347,7 @@ Next spec work (staying in the three-doc flow through Phase 06-local-deploy, no 
 - **OPEN-1 — TradeEventType enum gap.** The `03-events/02-domain-events-model` design catalogues event contracts required by other specs that are NOT among the 15 `TradeEventType` constants in the `shared-domain-contracts` shared kernel: `RISK_CALCULATION_FAILED`, the EOD status/completion event family, and `REPLAY_REQUESTED`. Resolution: extend the shared-kernel `TradeEventType` enum (backward-compatible addition) and update `01-shared-domain-contracts` requirements/design/tasks accordingly, before implementing the event-driven services. Tracked so it is not silently invented in code.
 
 **Refactor backlog** — ✅ **COMPLETE for all microservices.** Every `02-microservices` spec is now technology-agnostic (Technology Roles only — verified: zero product names/versions), business/domain-only (cross-cutting NFRs inherited from `architecture-golden-path/01-service-nfrs` via `(inherited GP-Rq-N)`), and DDD-framed (bounded contexts; `01-shared-domain-contracts` = shared kernel). Requirement counts: shared-kernel 12, trade-capture 5, trade-lifecycle 7, risk 8, eod 7, calendar 6, state-reconciliation 8.
-- ⬜ Remaining: `02-repo-skeleton` still needs an agnostic pass (not a service, so no golden-path inheritance — just replace product/version names with Technology Roles).
+- ✅ `02-repo-skeleton` design+tasks complete — scaffold implemented, all tasks green.
 
 ---
 

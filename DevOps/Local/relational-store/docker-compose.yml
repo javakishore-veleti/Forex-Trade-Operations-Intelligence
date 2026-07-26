@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16.4
+    container_name: fxops-postgres
+    environment:
+      POSTGRES_DB: fxtradeops
+      POSTGRES_USER: fxops
+      POSTGRES_PASSWORD: fxops_local_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - fxops-postgres-data:/var/lib/postgresql/data
+    networks:
+      - fxops-relational-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fxops -d fxtradeops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  fxops-postgres-data:
+
+networks:
+  fxops-relational-net:
+    driver: bridge

@@ -1,0 +1,14 @@
+{
+  "name": "forex-trade-operations-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Runtime-intelligence platform for foreign-exchange trade operations",
+  "scripts": {
+    "start": "./DevOps/Local/docker-all-up.sh",
+    "stop": "./DevOps/Local/docker-all-down.sh",
+    "status": "./DevOps/Local/all-status.sh",
+    "install:portals": "cd Portals/Admin && npm install && cd ../TraderDesk && npm install && cd ../FXTradeBlotter && npm install"
+  },
+  "keywords": ["fx", "trade-operations", "intelligence"],
+  "license": "UNLICENSED"
+}

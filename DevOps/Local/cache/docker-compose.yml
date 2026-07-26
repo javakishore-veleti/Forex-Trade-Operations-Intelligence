@@ -1,0 +1,22 @@
+services:
+  redis:
+    image: redis:7.4
+    container_name: fxops-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - fxops-redis-data:/data
+    networks:
+      - fxops-cache-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  fxops-redis-data:
+
+networks:
+  fxops-cache-net:
+    driver: bridge

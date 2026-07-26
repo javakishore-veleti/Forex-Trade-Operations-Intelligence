@@ -1,0 +1,9 @@
+# CODEOWNERS — Forex-Trade-Operations-Intelligence
+# Each line maps a directory to the team responsible for reviewing changes.
+
+/Middleware/          @fxops/middleware-team
+/Portals/            @fxops/frontend-team
+/Agents/             @fxops/agents-team
+/Sidecars/           @fxops/data-science-team
+/DevOps/             @fxops/platform-team
+/docs/               @fxops/architecture-team

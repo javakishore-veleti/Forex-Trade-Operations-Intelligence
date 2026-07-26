@@ -1,0 +1,26 @@
+services:
+  n8n:
+    image: n8nio/n8n:1.55.0
+    container_name: fxops-n8n
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: fxops
+      N8N_BASIC_AUTH_PASSWORD: fxops_local_dev
+    ports:
+      - "5678:5678"
+    volumes:
+      - fxops-n8n-data:/home/node/.n8n
+    networks:
+      - fxops-agent-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  fxops-n8n-data:
+
+networks:
+  fxops-agent-net:
+    driver: bridge
