@@ -280,13 +280,13 @@ All implemented as n8n workflow JSON exports only. No Python agent scripts.
 
 | Spec | Status | Scope |
 |---|---|---|
-| `08-aws-deploy/01-eks-cluster` | ⬜ Not started | EKS cluster config, node groups, namespaces, IAM roles, Helm chart structure for all Middleware services |
-| `08-aws-deploy/02-rds-postgres` | ⬜ Not started | RDS PostgreSQL setup, parameter groups, security groups, connection pooling |
-| `08-aws-deploy/03-msk-kafka` | ⬜ Not started | MSK Kafka cluster, broker config, topic creation, schema registry on AWS |
-| `08-aws-deploy/04-elasticache-redis` | ⬜ Not started | ElastiCache Redis cluster mode, eviction policy, TLS config |
-| `08-aws-deploy/05-documentdb-mongodb` | ⬜ Not started | DocumentDB cluster, MongoDB compatibility config, connection string migration |
-| `08-aws-deploy/06-neptune-neo4j` | ⬜ Not started | Neptune graph DB setup, Gremlin/openCypher config, data migration from local Neo4j |
-| `08-aws-deploy/07-opensearch-elk` | ⬜ Not started | OpenSearch domain, Logstash → OpenSearch pipeline, Kibana/OpenSearch Dashboards |
+| `08-aws-deploy/01-eks-cluster` | ✅ Requirements ✅ Design ✅ Tasks | EKS cluster config, node groups, namespaces, IAM roles, Helm chart structure for all Middleware services, ingress controller, HPA config |
+| `08-aws-deploy/02-rds-postgres` | ✅ Requirements ✅ Design ✅ Tasks | RDS PostgreSQL 16.x, parameter groups, security groups, Multi-AZ, RDS Proxy connection pooling, Flyway migration strategy, backup/retention |
+| `08-aws-deploy/03-msk-kafka` | ✅ Requirements ✅ Design ✅ Tasks | MSK Kafka cluster (3 brokers), broker config, topic creation automation, Glue Schema Registry, IAM auth |
+| `08-aws-deploy/04-elasticache-redis` | ✅ Requirements ✅ Design ✅ Tasks | ElastiCache Redis 7.x cluster mode, allkeys-lru eviction, TLS + AUTH, Spring Boot connection config |
+| `08-aws-deploy/05-documentdb-mongodb` | ✅ Requirements ✅ Design ✅ Tasks | DocumentDB cluster (MongoDB 7.0 compat), connection string migration, index provisioning, TLS |
+| `08-aws-deploy/06-neptune-neo4j` | ✅ Requirements ✅ Design ✅ Tasks | Neptune graph DB (openCypher), Neo4j EKS fallback, data migration strategy, ADR |
+| `08-aws-deploy/07-opensearch-elk` | ✅ Requirements ✅ Design ✅ Tasks | OpenSearch domain (ELK replacement), Fluent Bit pipeline, OpenSearch Dashboards, ISM lifecycle, saved queries migration |
 
 ---
 
@@ -331,9 +331,9 @@ Progress is tracked at the **requirements** stage (Kiro `requirements-first` wor
 | 05-observability | 4 | 4 ✅ | 4 ✅ | 4 ✅ | 0 |
 | 06-local-deploy | 3 | 3 ✅ | 3 ✅ | 3 ✅ | 0 |
 | 07-n8n-agents | 34 | 34 ✅ | 34 ✅ | 34 ✅ | 0 |
-| 08-aws-deploy | 7 | 0 | 0 | 0 | 7 |
+| 08-aws-deploy | 7 | 7 ✅ | 7 ✅ | 7 ✅ | 0 |
 | 09-azure-deploy | 6 | 0 | 0 | 0 | 6 |
-| **Total** | **71** | **58** | **52** | **52** | **13** |
+| **Total** | **71** | **65** | **59** | **59** | **6** |
 
 **Requirements baseline phases 01–06: COMPLETE ✅** (24 of 24 specs done, 2026-07-25)
 **Phase 02 microservices: req→design→tasks COMPLETE ✅** (all 7 bounded contexts fully specced, 2026-07-25)
