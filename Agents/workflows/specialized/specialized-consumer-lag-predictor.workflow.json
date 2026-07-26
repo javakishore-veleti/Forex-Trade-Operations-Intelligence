@@ -1,0 +1,285 @@
+{
+  "name": "Specialized — Consumer Lag SLA Predictor (Completion Forecast & HITL Scale Approval)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "consumer-lag-predictor",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "lag-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "consumer-lag-predictor"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getLagByPartition",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ consumerGroup: $json.body.consumerGroup, region: $json.body.region, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "lag-node-002",
+      "name": "Get Lag By Partition",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8500/sidecar/getCompletionForecast",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lagData: $json, region: $('Webhook Trigger').item.json.body.region, consumerGroup: $('Webhook Trigger').item.json.body.consumerGroup, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "lag-node-003",
+      "name": "Get Completion Forecast",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getHotPartitionKeys",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ consumerGroup: $('Webhook Trigger').item.json.body.consumerGroup, region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "lag-node-004",
+      "name": "Get Hot Partition Keys",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a capacity planner for an FX operations platform. Given: (1) per-partition lag, (2) completion forecast vs cutoff, (3) hot partition keys — determine if SLA is at risk. If yes, calculate required replicas using: target_completion = forecast × (current_replicas / proposed_replicas). Consider partition skew impact. Produce ScalingProposal JSON with: `slaAtRisk`, `currentReplicas`, `proposedReplicas`, `currentForecastMin`, `afterScaleForecastMin`, `cutoffMin`, `hotPartitions[]`, `confidence`. Never exceed 2× current replicas without justification.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Consumer lag SLA analysis for region {{ $('Webhook Trigger').item.json.body.region }}, consumer group {{ $('Webhook Trigger').item.json.body.consumerGroup }}:\n\nPer-Partition Lag:\n{{ JSON.stringify($('Get Lag By Partition').item.json, null, 2) }}\n\nCompletion Forecast:\n{{ JSON.stringify($('Get Completion Forecast').item.json, null, 2) }}\n\nHot Partition Keys:\n{{ JSON.stringify($('Get Hot Partition Keys').item.json, null, 2) }}\n\nProduce a ScalingProposal JSON evaluating SLA risk and proposing scaling if needed."
+      },
+      "id": "lag-node-005",
+      "name": "Scaling Planner",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "\"slaAtRisk\": true",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "lag-node-006",
+      "name": "SLA At Risk Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1420, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "lag-scale-approval",
+          "timeout": "30m"
+        }
+      },
+      "id": "lag-node-007",
+      "name": "Scale Approval Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1660, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "lag-node-008",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1900, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/requestReplicaScale",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ consumerGroup: $('Webhook Trigger').item.json.body.consumerGroup, region: $('Webhook Trigger').item.json.body.region, proposedReplicas: $('Scale Approval Gate').item.json.body.proposedReplicas || 26, approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId, scaledAt: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "H"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "lag-node-009",
+      "name": "Request Scale",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2140, 60]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'completed', agent: 'consumer-lag-predictor', region: $('Webhook Trigger').item.json.body.region, consumerGroup: $('Webhook Trigger').item.json.body.consumerGroup, scalingProposal: $('Scaling Planner').item.json.output, slaAtRisk: true, decision: $('Approval Handler').item.json.body ? $('Approval Handler').item.json.body.decision : 'NOT_REQUIRED', correlationId: $('Webhook Trigger').item.json.body.correlationId, completedAt: new Date().toISOString() }) }}"
+      },
+      "id": "lag-node-010",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2380, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Lag By Partition", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Lag By Partition": {
+      "main": [
+        [{ "node": "Get Completion Forecast", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Completion Forecast": {
+      "main": [
+        [{ "node": "Get Hot Partition Keys", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Hot Partition Keys": {
+      "main": [
+        [{ "node": "Scaling Planner", "type": "main", "index": 0 }]
+      ]
+    },
+    "Scaling Planner": {
+      "main": [
+        [{ "node": "SLA At Risk Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "SLA At Risk Check": {
+      "main": [
+        [{ "node": "Scale Approval Gate", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Scale Approval Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Request Scale", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Request Scale": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "consumer-lag-predictor" },
+    { "name": "agent" },
+    { "name": "risk-H" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

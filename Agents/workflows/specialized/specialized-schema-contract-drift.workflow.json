@@ -1,0 +1,285 @@
+{
+  "name": "Specialized — Schema & Contract Drift Agent (Compatibility Check & Breaking-Change Flag)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "schema-contract-drift",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "schema-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "schema-contract-drift"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getSchemaCompatibility",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ subject: $json.body.subject, version: $json.body.version, type: $json.body.type, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "schema-node-002",
+      "name": "Get Schema Compatibility",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/findConsumersOf",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ subject: $('Webhook Trigger').item.json.body.subject, topic: $json.topic || $('Webhook Trigger').item.json.body.subject, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "schema-node-003",
+      "name": "Find Consumers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/simulatePayloadAgainstConsumers",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ subject: $('Webhook Trigger').item.json.body.subject, version: $('Webhook Trigger').item.json.body.version, consumers: $json.consumers || [], compatibility: $('Get Schema Compatibility').item.json, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "schema-node-004",
+      "name": "Simulate Payload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a schema compatibility analyst for an FX trade platform. Given: (1) compatibility check result, (2) consumer list, (3) payload simulation results — identify which consumers will fail and which business flows (settlement, risk, reporting) will degrade. Rank by criticality. Include rollback guidance (prior version). Never invent consumers or flows. Output JSON: { breaking: bool, changes[], affectedConsumers[], businessFlows[], severity, rollbackVersion, summary }.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Schema drift analysis for subject {{ $('Webhook Trigger').item.json.body.subject }} version {{ $('Webhook Trigger').item.json.body.version }}:\n\nCompatibility Check Result:\n{{ JSON.stringify($('Get Schema Compatibility').item.json, null, 2) }}\n\nRegistered Consumers:\n{{ JSON.stringify($('Find Consumers').item.json, null, 2) }}\n\nPayload Simulation Results:\n{{ JSON.stringify($('Simulate Payload').item.json, null, 2) }}\n\nIdentify breaking changes, affected consumers, and impacted business flows."
+      },
+      "id": "schema-node-005",
+      "name": "Impact Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "\"breaking\": true",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "schema-node-006",
+      "name": "Breaking Change Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1420, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "schema-flag-approval",
+          "timeout": "4h"
+        }
+      },
+      "id": "schema-node-007",
+      "name": "Flag Approval Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1660, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "schema-node-008",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1900, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/flagBreakingChange",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ subject: $('Webhook Trigger').item.json.body.subject, version: $('Webhook Trigger').item.json.body.version, type: $('Webhook Trigger').item.json.body.type, impactAnalysis: $('Impact Analyzer').item.json.output, approverUserId: $('Flag Approval Gate').item.json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId, flaggedAt: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "M"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "schema-node-009",
+      "name": "Flag Breaking Change",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2140, 60]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'completed', agent: 'schema-contract-drift', subject: $('Webhook Trigger').item.json.body.subject, version: $('Webhook Trigger').item.json.body.version, driftReport: $('Impact Analyzer').item.json.output, flagged: $('Approval Handler').item.json.body ? $('Approval Handler').item.json.body.decision === 'APPROVED' : false, correlationId: $('Webhook Trigger').item.json.body.correlationId, completedAt: new Date().toISOString() }) }}"
+      },
+      "id": "schema-node-010",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2380, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Schema Compatibility", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Schema Compatibility": {
+      "main": [
+        [{ "node": "Find Consumers", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Consumers": {
+      "main": [
+        [{ "node": "Simulate Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "Simulate Payload": {
+      "main": [
+        [{ "node": "Impact Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Impact Analyzer": {
+      "main": [
+        [{ "node": "Breaking Change Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Breaking Change Check": {
+      "main": [
+        [{ "node": "Flag Approval Gate", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Flag Approval Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Flag Breaking Change", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Flag Breaking Change": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "schema-contract-drift" },
+    { "name": "agent" },
+    { "name": "risk-M" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

@@ -1,0 +1,235 @@
+{
+  "name": "Specialized — Trace Latency Agent (Distributed-Trace Latency Explanation)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trace-latency",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "trace-lat-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "trace-latency"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getTradeTrace",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $json.body.tradeId, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "trace-lat-node-002",
+      "name": "Get Trade Trace",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getSpanBreakdown",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ traceId: $json.traceId, tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "trace-lat-node-003",
+      "name": "Get Span Breakdown",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getServiceBaseline",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ spans: $json.slowSpans || $json.spans, tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "trace-lat-node-004",
+      "name": "Get Service Baselines",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/correlateToDeploy",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ services: $('Get Span Breakdown').item.json.slowSpans || [], timeframe: $('Webhook Trigger').item.json.body.slaBreach, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "trace-lat-node-005",
+      "name": "Correlate to Deploy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 420]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "Parse the span tree and breakdown into structured facts. For each span: service name, duration_ms, is_slow (exceeds baseline), parent span. Identify the critical path. Output as JSON array of SpanFact objects.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Analyze the following distributed trace data for trade {{ $('Webhook Trigger').item.json.body.tradeId }}:\n\nSpan Breakdown:\n{{ JSON.stringify($('Get Span Breakdown').item.json, null, 2) }}\n\nService Baselines:\n{{ JSON.stringify($('Get Service Baselines').item.json, null, 2) }}\n\nParse these into structured SpanFact objects identifying the critical path and slow spans."
+      },
+      "id": "trace-lat-node-006",
+      "name": "Trace Perception",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a distributed systems latency analyst. Given: structured span facts, service baselines, and deployment correlation — produce a root cause chain. Format: 'X slow → Y stalled → Z missed cutoff'. Include: (1) primary bottleneck, (2) infrastructure factor (pool exhaustion, GC, dependency), (3) whether correlated to a deploy. If no breach, state 'all spans within SLA'. Output as LatencyReport JSON with `rootCause`, `chain[]`, `deployCorrelation`, `recommendation`.",
+          "temperature": 0.2
+        },
+        "promptType": "define",
+        "text": "=Root cause analysis for trade {{ $('Webhook Trigger').item.json.body.tradeId }}:\n\nSLA Breach Context:\n{{ JSON.stringify($('Webhook Trigger').item.json.body.slaBreach, null, 2) }}\n\nStructured Span Facts:\n{{ $('Trace Perception').item.json.output }}\n\nDeploy Correlation:\n{{ JSON.stringify($('Correlate to Deploy').item.json, null, 2) }}\n\nQuestion: {{ $('Webhook Trigger').item.json.body.question || 'Why was this trade slow?' }}\n\nProduce a LatencyReport JSON with root cause chain and recommendation."
+      },
+      "id": "trace-lat-node-007",
+      "name": "Root Cause Synthesizer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1420, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'completed', agent: 'trace-latency', tradeId: $('Webhook Trigger').item.json.body.tradeId, latencyReport: $('Root Cause Synthesizer').item.json.output, correlationId: $('Webhook Trigger').item.json.body.correlationId, completedAt: new Date().toISOString() }) }}"
+      },
+      "id": "trace-lat-node-008",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1660, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Trade Trace", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Trade Trace": {
+      "main": [
+        [{ "node": "Get Span Breakdown", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Span Breakdown": {
+      "main": [
+        [
+          { "node": "Get Service Baselines", "type": "main", "index": 0 },
+          { "node": "Correlate to Deploy", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Service Baselines": {
+      "main": [
+        [{ "node": "Trace Perception", "type": "main", "index": 0 }]
+      ]
+    },
+    "Correlate to Deploy": {
+      "main": [
+        [{ "node": "Trace Perception", "type": "main", "index": 0 }]
+      ]
+    },
+    "Trace Perception": {
+      "main": [
+        [{ "node": "Root Cause Synthesizer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Root Cause Synthesizer": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "trace-latency" },
+    { "name": "agent" },
+    { "name": "risk-L" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

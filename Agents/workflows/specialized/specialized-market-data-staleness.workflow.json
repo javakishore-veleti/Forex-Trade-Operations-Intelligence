@@ -1,0 +1,288 @@
+{
+  "name": "Specialized — Market Data Feed Staleness Agent (Tick Gap Detection & Risk Calc Gate)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "market-data-staleness",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "mkt-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "market-data-staleness"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8082/mcp/getStalePairs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pairs: $json.body.pairs, region: $json.body.region, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "mkt-node-002",
+      "name": "Get Stale Pairs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8082/mcp/detectCrossedQuote",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pairs: $('Webhook Trigger').item.json.body.pairs, region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "mkt-node-003",
+      "name": "Detect Crossed Quotes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8082/mcp/getDownstreamRiskDependency",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ stalePairs: $('Get Stale Pairs').item.json.stalePairs || [], crossedPairs: $('Detect Crossed Quotes').item.json.crossedPairs || [], region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "mkt-node-004",
+      "name": "Get Downstream Dependencies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a market-data quality analyst for an FX platform. Given: (1) stale pairs with last-tick ages, (2) crossed-quote pairs, (3) downstream risk dependencies — assess business impact. Distinguish stale-during-trading-hours from expected silence. Group affected pairs by feed source if possible. Recommend blockRiskCalc for pairs where staleness > critical threshold and trades are pending. Output JSON: { stalePairs[], crossedPairs[], affectedTrades[], blockRecommendation[], severity, summary }.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Market data staleness analysis for region {{ $('Webhook Trigger').item.json.body.region }}:\n\nStale Pairs:\n{{ JSON.stringify($('Get Stale Pairs').item.json, null, 2) }}\n\nCrossed Quotes:\n{{ JSON.stringify($('Detect Crossed Quotes').item.json, null, 2) }}\n\nDownstream Risk Dependencies:\n{{ JSON.stringify($('Get Downstream Dependencies').item.json, null, 2) }}\n\nAssess impact and determine if blockRiskCalc is needed for any pairs."
+      },
+      "id": "mkt-node-005",
+      "name": "Impact Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "blockRecommendation",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "mkt-node-006",
+      "name": "Block Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "mkt-block-approval",
+          "timeout": "15m"
+        }
+      },
+      "id": "mkt-node-007",
+      "name": "Block Approval Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1420, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "mkt-node-008",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1660, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8082/mcp/blockRiskCalc",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pairs: $('Block Approval Gate').item.json.body.pairs || $('Webhook Trigger').item.json.body.pairs, region: $('Webhook Trigger').item.json.body.region, approverUserId: $('Block Approval Gate').item.json.body.approverUserId, reason: 'stale-market-data', correlationId: $('Webhook Trigger').item.json.body.correlationId, blockedAt: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "M"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "mkt-node-009",
+      "name": "Block Risk Calc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1900, 60]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'completed', agent: 'market-data-staleness', region: $('Webhook Trigger').item.json.body.region, pairs: $('Webhook Trigger').item.json.body.pairs, impactAnalysis: $('Impact Analyzer').item.json.output, blockApplied: $('Approval Handler').item.json.body ? $('Approval Handler').item.json.body.decision === 'APPROVED' : false, correlationId: $('Webhook Trigger').item.json.body.correlationId, completedAt: new Date().toISOString() }) }}"
+      },
+      "id": "mkt-node-010",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2140, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Get Stale Pairs", "type": "main", "index": 0 },
+          { "node": "Detect Crossed Quotes", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Stale Pairs": {
+      "main": [
+        [{ "node": "Get Downstream Dependencies", "type": "main", "index": 0 }]
+      ]
+    },
+    "Detect Crossed Quotes": {
+      "main": [
+        [{ "node": "Get Downstream Dependencies", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Downstream Dependencies": {
+      "main": [
+        [{ "node": "Impact Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Impact Analyzer": {
+      "main": [
+        [{ "node": "Block Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Block Check": {
+      "main": [
+        [{ "node": "Block Approval Gate", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Block Approval Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Block Risk Calc", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Block Risk Calc": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "market-data-staleness" },
+    { "name": "agent" },
+    { "name": "risk-M" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

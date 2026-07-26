@@ -1,0 +1,196 @@
+{
+  "name": "Specialized — Runtime Intent-Inference Agent (Behavioral Clustering & Suppression)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "runtime-intent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "intent-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "runtime-intent"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getRecentActivity",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ window: $json.body.window, region: $json.body.region, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "intent-node-002",
+      "name": "Fetch Recent Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8500/sidecar/classifyIntent",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ activitySignals: $json.signals || $json, window: $('Webhook Trigger').item.json.body.window, region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "intent-node-003",
+      "name": "Behavioral Clustering",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://business-calendar-service:8084/mcp/alignToBusinessGoal",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ window: $('Webhook Trigger').item.json.body.window, region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "intent-node-004",
+      "name": "Align to Business Goal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 420]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are an operational intent classifier for an FX trade platform. Given: (1) clustered activity signals, (2) business goal alignment data — classify the activity into one of: EOD_RAMP, FAILOVER, LOAD_TEST, INCIDENT, MAINTENANCE, UNKNOWN. Provide confidence (0-1), evidence list, and suppression guidance (scope, duration). If confidence > 0.8 and intent aligns with a goal, set suppressAlerts=true. Never suppress for INCIDENT or UNKNOWN. Output as IntentEnvelope JSON.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Classify the operational intent for region {{ $('Webhook Trigger').item.json.body.region }} in window {{ $('Webhook Trigger').item.json.body.window }}:\n\nClustered Activity Signals:\n{{ JSON.stringify($('Behavioral Clustering').item.json, null, 2) }}\n\nBusiness Goal Alignment:\n{{ JSON.stringify($('Align to Business Goal').item.json, null, 2) }}\n\nClassify the intent and provide suppression guidance as IntentEnvelope JSON."
+      },
+      "id": "intent-node-005",
+      "name": "Intent Classifier",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ intent: $json.output, region: $('Webhook Trigger').item.json.body.region, window: $('Webhook Trigger').item.json.body.window, correlationId: $('Webhook Trigger').item.json.body.correlationId, classifiedAt: new Date().toISOString() }) }}"
+      },
+      "id": "intent-node-006",
+      "name": "Build Intent Envelope",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'completed', agent: 'runtime-intent', intentEnvelope: $json, correlationId: $('Webhook Trigger').item.json.body.correlationId, completedAt: new Date().toISOString() }) }}"
+      },
+      "id": "intent-node-007",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1420, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Fetch Recent Activity", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Recent Activity": {
+      "main": [
+        [
+          { "node": "Behavioral Clustering", "type": "main", "index": 0 },
+          { "node": "Align to Business Goal", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Behavioral Clustering": {
+      "main": [
+        [{ "node": "Intent Classifier", "type": "main", "index": 0 }]
+      ]
+    },
+    "Align to Business Goal": {
+      "main": [
+        [{ "node": "Intent Classifier", "type": "main", "index": 0 }]
+      ]
+    },
+    "Intent Classifier": {
+      "main": [
+        [{ "node": "Build Intent Envelope", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Intent Envelope": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "runtime-intent" },
+    { "name": "agent" },
+    { "name": "risk-L" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}
