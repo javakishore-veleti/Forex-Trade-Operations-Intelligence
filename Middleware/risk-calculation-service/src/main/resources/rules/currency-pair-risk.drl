@@ -1,0 +1,87 @@
+// RULE_VERSION: RULES-7.14
+package com.fxtradeops.riskcalc.rules;
+
+import com.fxtradeops.riskcalc.domain.RiskFact;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+// FX-PAIR-EURUSD-001: EUR/USD specific volatility rule
+rule "FX-PAIR-EURUSD-001"
+    when
+        $fact : RiskFact( currencyPairCode == "EURUSD" )
+    then
+        BigDecimal notional = $fact.getNotionalAmount();
+        BigDecimal volatility = notional.multiply(new BigDecimal("0.0250")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal exposure = notional.multiply(new BigDecimal("0.0100")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal regional = notional.multiply(new BigDecimal("0.0050")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal risk = volatility.add(exposure).add(regional).setScale(4, RoundingMode.HALF_UP);
+        $fact.setVolatilityFactor(volatility);
+        $fact.setNotionalExposureFactor(exposure);
+        $fact.setRegionalAdjustmentFactor(regional);
+        $fact.setRiskAmount(risk);
+        $fact.addRuleFired("FX-PAIR-EURUSD-001");
+end
+
+// FX-PAIR-USDJPY-002: USD/JPY specific volatility rule
+rule "FX-PAIR-USDJPY-002"
+    when
+        $fact : RiskFact( currencyPairCode == "USDJPY" )
+    then
+        BigDecimal notional = $fact.getNotionalAmount();
+        BigDecimal volatility = notional.multiply(new BigDecimal("0.0300")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal exposure = notional.multiply(new BigDecimal("0.0120")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal regional = notional.multiply(new BigDecimal("0.0080")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal risk = volatility.add(exposure).add(regional).setScale(4, RoundingMode.HALF_UP);
+        $fact.setVolatilityFactor(volatility);
+        $fact.setNotionalExposureFactor(exposure);
+        $fact.setRegionalAdjustmentFactor(regional);
+        $fact.setRiskAmount(risk);
+        $fact.addRuleFired("FX-PAIR-USDJPY-002");
+end
+
+// FX-PAIR-GBPUSD-003: GBP/USD specific volatility rule
+rule "FX-PAIR-GBPUSD-003"
+    when
+        $fact : RiskFact( currencyPairCode == "GBPUSD" )
+    then
+        BigDecimal notional = $fact.getNotionalAmount();
+        BigDecimal volatility = notional.multiply(new BigDecimal("0.0280")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal exposure = notional.multiply(new BigDecimal("0.0110")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal regional = notional.multiply(new BigDecimal("0.0060")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal risk = volatility.add(exposure).add(regional).setScale(4, RoundingMode.HALF_UP);
+        $fact.setVolatilityFactor(volatility);
+        $fact.setNotionalExposureFactor(exposure);
+        $fact.setRegionalAdjustmentFactor(regional);
+        $fact.setRiskAmount(risk);
+        $fact.addRuleFired("FX-PAIR-GBPUSD-003");
+end
+
+// FX-REGION-APAC-042: APAC region adjustment rule
+rule "FX-REGION-APAC-042"
+    when
+        $fact : RiskFact( regionCode == "APAC", riskAmount > BigDecimal.ZERO )
+    then
+        BigDecimal current = $fact.getRiskAmount();
+        BigDecimal adjustment = current.multiply(new BigDecimal("0.05")).setScale(4, RoundingMode.HALF_UP);
+        $fact.setRegionalAdjustmentFactor($fact.getRegionalAdjustmentFactor().add(adjustment));
+        $fact.setRiskAmount(current.add(adjustment).setScale(4, RoundingMode.HALF_UP));
+        $fact.addRuleFired("FX-REGION-APAC-042");
+end
+
+// FALLBACK: Default catch-all rule for uncovered currency pairs (salience -1)
+rule "FALLBACK"
+    salience -1
+    when
+        $fact : RiskFact( riskAmount == BigDecimal.ZERO )
+    then
+        BigDecimal notional = $fact.getNotionalAmount();
+        BigDecimal volatility = notional.multiply(new BigDecimal("0.0200")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal exposure = notional.multiply(new BigDecimal("0.0100")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal regional = notional.multiply(new BigDecimal("0.0050")).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal risk = volatility.add(exposure).add(regional).setScale(4, RoundingMode.HALF_UP);
+        $fact.setVolatilityFactor(volatility);
+        $fact.setNotionalExposureFactor(exposure);
+        $fact.setRegionalAdjustmentFactor(regional);
+        $fact.setRiskAmount(risk);
+        $fact.addRuleFired("FALLBACK");
+end

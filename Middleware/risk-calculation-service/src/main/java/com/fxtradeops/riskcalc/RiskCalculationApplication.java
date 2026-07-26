@@ -1,4 +1,4 @@
-package com.fxtradeops.riskcalculation;
+package com.fxtradeops.riskcalc;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
