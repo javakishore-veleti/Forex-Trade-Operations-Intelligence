@@ -12,6 +12,23 @@
 | [0005](adr/0005-event-driven-architecture.md) | Event-Driven Architecture with Kafka |
 | [0006](adr/0006-mcp-tool-protocol.md) | MCP Tool Protocol for Agent-Service Communication |
 | [0007](adr/0007-multi-tool-ai-strategy.md) | Multi-Tool AI Development Strategy |
+| [0008](adr/0008-shared-domain-contracts-java-records.md) | Java Records for Immutable Domain Types |
+| [0009](adr/0009-trade-ingest-postgresql-sequence.md) | PostgreSQL Sequence for Trade ID Generation |
+| [0010](adr/0010-trade-lifecycle-static-transition-table.md) | Static Transition Table for Trade Lifecycle State Machine |
+| [0011](adr/0011-risk-calculation-drools-stateless.md) | Drools StatelessKieSession per Risk Calculation |
+| [0012](adr/0012-business-calendar-immutable-registry.md) | Immutable In-Memory CalendarRegistry at Startup |
+| [0013](adr/0013-eod-processing-pure-readiness-evaluator.md) | Pure Function ReadinessEvaluator for EOD Processing |
+| [0014](adr/0014-state-reconciliation-event-history.md) | Canonical State from Event History |
+| [0015](adr/0015-kafka-topic-per-aggregate.md) | Kafka Topic per Domain Aggregate |
+| [0016](adr/0016-event-sequence-kafka-streams.md) | Kafka Streams for Event Sequence Processor |
+| [0017](adr/0017-dlq-quarantine-headers.md) | DLQ with Quarantine Headers |
+| [0018](adr/0018-schema-registry-backward-compat.md) | Schema Registry BACKWARD Compatibility |
+| [0019](adr/0019-three-separate-angular-apps.md) | Three Separate Angular Apps |
+| [0020](adr/0020-polling-for-realtime-data.md) | Polling for Real-Time Data |
+| [0021](adr/0021-otel-auto-instrumentation.md) | OTel Auto-Instrumentation Agent |
+| [0022](adr/0022-structured-json-logs.md) | Structured JSON Logs |
+| [0023](adr/0023-spring-ai-mcp-server.md) | Spring AI MCP Server for Tool Exposure |
+| [0024](adr/0024-python-sidecars-webhook-triggers.md) | Python Sidecars as Webhook Triggers |
 
 ### Observability
 | Document | Description |
