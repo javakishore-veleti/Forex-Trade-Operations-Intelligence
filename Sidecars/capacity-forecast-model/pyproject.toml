@@ -7,7 +7,7 @@ name = "capacity-forecast-model"
 version = "0.1.0"
 description = "Forecasts capacity needs for FX trade infrastructure"
 requires-python = ">=3.11"
-license = "UNLICENSED"
+license = "MIT"
 dependencies = []
 
 [project.optional-dependencies]

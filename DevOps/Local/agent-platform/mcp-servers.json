@@ -1,0 +1,39 @@
+{
+  "mcpServers": [
+    {
+      "name": "trade-lifecycle-mcp",
+      "description": "Trade lifecycle query tools — getTrade, getTradeEvents, getTradeTimeline",
+      "baseUrl": "http://trade-lifecycle-service:8081/mcp",
+      "tools": ["getTrade", "getTradeEvents", "getTradeTimeline"],
+      "riskLevel": "L"
+    },
+    {
+      "name": "state-reconciliation-mcp",
+      "description": "State reconciliation tools — evaluateCanonicalState, startReconciliation",
+      "baseUrl": "http://state-reconciliation-service:8082/mcp",
+      "tools": ["evaluateCanonicalState", "startReconciliation"],
+      "riskLevel": "M"
+    },
+    {
+      "name": "risk-calculation-mcp",
+      "description": "Risk calculation query tools — getRiskResult, getRuleTrace",
+      "baseUrl": "http://risk-calculation-service:8083/mcp",
+      "tools": ["getRiskResult", "getRuleTrace"],
+      "riskLevel": "L"
+    },
+    {
+      "name": "eod-processing-mcp",
+      "description": "EOD processing query tools — getRegionalCloseStatus, getReadinessStatusMap",
+      "baseUrl": "http://eod-processing-service:8084/mcp",
+      "tools": ["getRegionalCloseStatus", "getReadinessStatusMap"],
+      "riskLevel": "L"
+    },
+    {
+      "name": "business-calendar-mcp",
+      "description": "Business calendar tools — getBusinessCalendar, classifyBookingDate",
+      "baseUrl": "http://business-calendar-service:8085/mcp",
+      "tools": ["getBusinessCalendar", "classifyBookingDate"],
+      "riskLevel": "L"
+    }
+  ]
+}

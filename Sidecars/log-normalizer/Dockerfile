@@ -7,4 +7,6 @@ COPY src/ src/
 
 RUN pip install --no-cache-dir .
 
-ENTRYPOINT ["python", "-m", "log_normalizer"]
+COPY tests/ tests/
+
+CMD ["python", "-m", "log_normalizer"]

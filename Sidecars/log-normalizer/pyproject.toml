@@ -7,7 +7,7 @@ name = "log-normalizer"
 version = "0.1.0"
 description = "Normalizes and structures FX trade operation logs for downstream analysis"
 requires-python = ">=3.11"
-license = "UNLICENSED"
+license = "MIT"
 dependencies = []
 
 [project.optional-dependencies]

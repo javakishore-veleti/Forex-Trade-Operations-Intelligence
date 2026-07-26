@@ -1,0 +1,38 @@
+services:
+  n8n:
+    image: n8nio/n8n:1.55.0
+    container_name: fxops-n8n
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: fxops
+      N8N_BASIC_AUTH_PASSWORD: fxops_local_dev
+      N8N_WEBHOOK_URL: "http://fxops-n8n:5678/"
+      # MCP server registry
+      MCP_SERVERS_CONFIG: "/config/mcp-servers.json"
+      # Sidecar webhook base
+      SIDECAR_WEBHOOK_BASE: "http://fxops-n8n:5678/webhook"
+      # Service endpoints (container DNS names)
+      TRADE_LIFECYCLE_URL: "http://trade-lifecycle-service:8081"
+      STATE_RECONCILIATION_URL: "http://state-reconciliation-service:8082"
+      RISK_CALCULATION_URL: "http://risk-calculation-service:8083"
+      EOD_PROCESSING_URL: "http://eod-processing-service:8084"
+      BUSINESS_CALENDAR_URL: "http://business-calendar-service:8085"
+    ports:
+      - "5678:5678"
+    volumes:
+      - fxops-n8n-data:/home/node/.n8n
+      - ./mcp-servers.json:/config/mcp-servers.json:ro
+    networks:
+      - fxops-agent-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  fxops-n8n-data:
+
+networks:
+  fxops-agent-net:
+    driver: bridge

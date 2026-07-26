@@ -7,7 +7,7 @@ name = "dlq-cluster-analyzer"
 version = "0.1.0"
 description = "Clusters and categorizes dead-letter-queue errors for FX trade operations"
 requires-python = ">=3.11"
-license = "UNLICENSED"
+license = "MIT"
 dependencies = []
 
 [project.optional-dependencies]
