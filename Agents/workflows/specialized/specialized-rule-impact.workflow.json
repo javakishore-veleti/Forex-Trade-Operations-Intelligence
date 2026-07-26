@@ -1,0 +1,408 @@
+{
+  "name": "Specialized — Rule Impact Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rule-impact",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "rule-imp-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "rule-impact-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getRuleFiringStats",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ruleId: $json.body.ruleId, timeWindow: '24h' }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "rule-imp-002",
+      "name": "Fetch Firing Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/compareRuleBehavior",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ruleId: $('Webhook Trigger').item.json.body.ruleId, preVersion: $('Webhook Trigger').item.json.body.priorVersion, postVersion: $('Webhook Trigger').item.json.body.ruleVersion }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "rule-imp-003",
+      "name": "Compare Behavior",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/findConflictingRules",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ruleId: $('Webhook Trigger').item.json.body.ruleId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "rule-imp-004",
+      "name": "Find Conflicts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 420]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a rule impact analyst for an FX platform. Given firing stats, behavior comparison, and conflict analysis, determine: (1) root cause of the anomaly, (2) affected scope (pairs, books, regions), (3) business impact (trades rejected, exposure change), (4) classification: over-firing/under-firing/pattern-shift. Output structured JSON.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Anomaly Envelope:\n- Rule ID: {{ $('Webhook Trigger').item.json.body.ruleId }}\n- Rule Version: {{ $('Webhook Trigger').item.json.body.ruleVersion }}\n- Prior Version: {{ $('Webhook Trigger').item.json.body.priorVersion }}\n- Anomaly Type: {{ $('Webhook Trigger').item.json.body.anomalyType }}\n- Deviation %: {{ $('Webhook Trigger').item.json.body.deviationPct }}\n- Affected Pairs: {{ JSON.stringify($('Webhook Trigger').item.json.body.affectedPairs) }}\n\nFiring Stats:\n{{ JSON.stringify($('Fetch Firing Stats').item.json) }}\n\nBehavior Comparison ({{ $('Webhook Trigger').item.json.body.priorVersion }} vs {{ $('Webhook Trigger').item.json.body.ruleVersion }}):\n{{ JSON.stringify($('Compare Behavior').item.json) }}\n\nConflicting Rules:\n{{ JSON.stringify($('Find Conflicts').item.json) }}\n\nAnalyze the root cause and business impact of this rule anomaly."
+      },
+      "id": "rule-imp-005",
+      "name": "Impact Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1020, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/simulateRule",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ruleId: $('Webhook Trigger').item.json.body.ruleId, targetVersion: $('Webhook Trigger').item.json.body.priorVersion, sampleTrades: $('Fetch Firing Stats').item.json.affectedTradeIds || [] }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "rule-imp-006",
+      "name": "Simulate Rollback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://vector-search-service:8090/mcp/searchSimilarDefects",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $('Impact Analyzer').item.json.output, ruleId: $('Webhook Trigger').item.json.body.ruleId, limit: 3 }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "rule-imp-007",
+      "name": "Similar Defect Retrieval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "Given the impact analysis, simulation results, and similar historical defects, produce a rollback proposal. Include: target version, estimated impact of rollback, risk of keeping current version, trades that would be re-evaluated. Never recommend rollback unless the anomaly is confirmed material. Output as RollbackProposal envelope.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Impact Analysis:\n{{ $('Impact Analyzer').item.json.output }}\n\nSimulation Results (rolling back to {{ $('Webhook Trigger').item.json.body.priorVersion }}):\n{{ JSON.stringify($('Simulate Rollback').item.json) }}\n\nSimilar Historical Defects:\n{{ JSON.stringify($('Similar Defect Retrieval').item.json) }}\n\nAnomaly Details:\n- Rule: {{ $('Webhook Trigger').item.json.body.ruleId }}\n- Current Version: {{ $('Webhook Trigger').item.json.body.ruleVersion }}\n- Target Rollback Version: {{ $('Webhook Trigger').item.json.body.priorVersion }}\n- Deviation: {{ $('Webhook Trigger').item.json.body.deviationPct }}%\n\nProduce a rollback proposal or recommend no action."
+      },
+      "id": "rule-imp-008",
+      "name": "Rollback Proposal",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1800, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "rollback",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "rule-imp-009",
+      "name": "HITL Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2060, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "rule-impact-approval",
+          "timeout": "2h"
+        }
+      },
+      "id": "rule-imp-010",
+      "name": "Wait for Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2280, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "rule-imp-011",
+      "name": "Approval Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2500, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/requestRuleRollback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ruleId: $('Webhook Trigger').item.json.body.ruleId, targetVersion: $('Webhook Trigger').item.json.body.priorVersion, approvalReference: $json.body.approvalReference, approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "H"
+            },
+            {
+              "name": "X-Approval-Reference",
+              "value": "={{ $json.body.approvalReference }}"
+            }
+          ]
+        }
+      },
+      "id": "rule-imp-012",
+      "name": "Execute Rollback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2720, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8082/mcp/logAuditEvent",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ eventType: 'RULE_ROLLBACK_DENIED', ruleId: $('Webhook Trigger').item.json.body.ruleId, ruleVersion: $('Webhook Trigger').item.json.body.ruleVersion, deniedBy: $json.body.approverUserId || 'unknown', correlationId: $('Webhook Trigger').item.json.body.correlationId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "rule-imp-013",
+      "name": "Log Denial",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2720, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'SUCCESS', agentId: 'rule-impact', ruleId: $('Webhook Trigger').item.json.body.ruleId, impactAnalysis: $('Impact Analyzer').item.json.output, rollbackProposal: $('Rollback Proposal').item.json.output, correlationId: $('Webhook Trigger').item.json.body.correlationId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "rule-imp-014",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2940, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Fetch Firing Stats", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Firing Stats": {
+      "main": [
+        [
+          { "node": "Compare Behavior", "type": "main", "index": 0 },
+          { "node": "Find Conflicts", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Compare Behavior": {
+      "main": [
+        [{ "node": "Impact Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Conflicts": {
+      "main": [
+        [{ "node": "Impact Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Impact Analyzer": {
+      "main": [
+        [{ "node": "Simulate Rollback", "type": "main", "index": 0 }]
+      ]
+    },
+    "Simulate Rollback": {
+      "main": [
+        [{ "node": "Similar Defect Retrieval", "type": "main", "index": 0 }]
+      ]
+    },
+    "Similar Defect Retrieval": {
+      "main": [
+        [{ "node": "Rollback Proposal", "type": "main", "index": 0 }]
+      ]
+    },
+    "Rollback Proposal": {
+      "main": [
+        [{ "node": "HITL Gate", "type": "main", "index": 0 }]
+      ]
+    },
+    "HITL Gate": {
+      "main": [
+        [{ "node": "Wait for Approval", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait for Approval": {
+      "main": [
+        [{ "node": "Approval Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Check": {
+      "main": [
+        [{ "node": "Execute Rollback", "type": "main", "index": 0 }],
+        [{ "node": "Log Denial", "type": "main", "index": 0 }]
+      ]
+    },
+    "Execute Rollback": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Denial": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "rule-impact" },
+    { "name": "agent" },
+    { "name": "hitl-gated" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

@@ -1,0 +1,219 @@
+{
+  "name": "Specialized — Rule Coverage Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rule-coverage",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "rule-cov-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "rule-coverage-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getRuleCoverageMatrix",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "rule-cov-002",
+      "name": "Fetch Coverage Matrix",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getFallbackFiringRate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pair: $('Webhook Trigger').item.json.body.pair }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "rule-cov-003",
+      "name": "Fetch Fallback Rate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getUncoveredPairs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "rule-cov-004",
+      "name": "Fetch Uncovered Pairs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/simulateRuleGap",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pair: $('Webhook Trigger').item.json.body.pair }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "rule-cov-005",
+      "name": "Simulate Gap",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 320]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a rule coverage analyst for an FX platform. Given coverage matrix, fallback firing rates, uncovered pairs, and gap simulation results — explain: (1) which pairs are at risk, (2) what business impact the gap creates (mispricing, unintended exposure), (3) what type of rule is needed (without writing the rule). Rank by materiality. Never invent data. Output as CoverageReport envelope.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Trigger Type: {{ $('Webhook Trigger').item.json.body.triggerType }}\nTarget Pair: {{ $('Webhook Trigger').item.json.body.pair }}\nReported Fallback Rate: {{ $('Webhook Trigger').item.json.body.fallbackRate }}%\nBaseline Rate: {{ $('Webhook Trigger').item.json.body.baselineRate }}%\n\nCoverage Matrix:\n{{ JSON.stringify($('Fetch Coverage Matrix').item.json) }}\n\nFallback Firing Rate Details:\n{{ JSON.stringify($('Fetch Fallback Rate').item.json) }}\n\nUncovered Pairs:\n{{ JSON.stringify($('Fetch Uncovered Pairs').item.json) }}\n\nGap Simulation ({{ $('Webhook Trigger').item.json.body.pair }}):\n{{ JSON.stringify($('Simulate Gap').item.json) }}\n\nAnalyze the coverage gaps and produce a CoverageReport with ranked risks and recommendations."
+      },
+      "id": "rule-cov-006",
+      "name": "Gap Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1060, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'SUCCESS', agentId: 'rule-coverage', pair: $('Webhook Trigger').item.json.body.pair, coverageReport: $json.output, correlationId: $('Webhook Trigger').item.json.body.correlationId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "rule-cov-007",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 320]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Fetch Coverage Matrix", "type": "main", "index": 0 },
+          { "node": "Fetch Fallback Rate", "type": "main", "index": 0 },
+          { "node": "Fetch Uncovered Pairs", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Coverage Matrix": {
+      "main": [
+        [{ "node": "Simulate Gap", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Fallback Rate": {
+      "main": [
+        [{ "node": "Simulate Gap", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Uncovered Pairs": {
+      "main": [
+        [{ "node": "Simulate Gap", "type": "main", "index": 0 }]
+      ]
+    },
+    "Simulate Gap": {
+      "main": [
+        [{ "node": "Gap Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gap Analyzer": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "rule-coverage" },
+    { "name": "agent" },
+    { "name": "read-only" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

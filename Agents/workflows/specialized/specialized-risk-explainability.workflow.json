@@ -1,0 +1,271 @@
+{
+  "name": "Specialized — Risk Explainability",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "risk-explainability",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "risk-exp-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "risk-explainability-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getRiskResult",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $json.body.tradeId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "risk-exp-002",
+      "name": "Fetch Risk Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 140]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/getRuleTrace",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "risk-exp-003",
+      "name": "Fetch Rule Trace",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://market-data-service:8086/mcp/getMarketSnapshot",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pair: $('Webhook Trigger').item.json.body.pair || 'EUR/USD', timestamp: $('Webhook Trigger').item.json.body.timestamp || new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "risk-exp-004",
+      "name": "Fetch Market Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 460]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getTradeCharacteristics",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "risk-exp-005",
+      "name": "Fetch Trade Characteristics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 620]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "Translate the following rule trace into business-readable language. Preserve rule version, activation condition, and impact value. Do not invent information. Output JSON array of { ruleId, version, businessDescription, impact, direction }.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Rule trace data:\n{{ JSON.stringify($('Fetch Rule Trace').item.json) }}\n\nTrade characteristics:\n{{ JSON.stringify($('Fetch Trade Characteristics').item.json) }}\n\nTranslate the rule trace into business-readable language. Return a JSON array."
+      },
+      "id": "risk-exp-006",
+      "name": "Rule Trace Translator",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [780, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://vector-search-service:8090/mcp/searchSimilarCases",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $('Webhook Trigger').item.json.body.question || 'risk explanation', tradeId: $('Webhook Trigger').item.json.body.tradeId, factors: $('Fetch Risk Result').item.json.contributingFactors || [], limit: 3 }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "risk-exp-007",
+      "name": "Similar Case Retrieval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a risk explanation agent for an FX trade operations platform. Given: (1) risk results with contributing factors, (2) readable rule trace, (3) market snapshot, (4) trade characteristics, and (5) similar historical cases — produce a coherent multi-factor explanation. Rank factors by impact magnitude. Never invent facts beyond the provided data. Format as ExplanationEnvelope with `factors[]`, `summary`, `similarCases[]`, `provenance`.",
+          "temperature": 0.2
+        },
+        "promptType": "define",
+        "text": "=Question: {{ $('Webhook Trigger').item.json.body.question }}\nTrade ID: {{ $('Webhook Trigger').item.json.body.tradeId }}\n\nRisk Result:\n{{ JSON.stringify($('Fetch Risk Result').item.json) }}\n\nRule Trace (business-readable):\n{{ $('Rule Trace Translator').item.json.output }}\n\nMarket Snapshot:\n{{ JSON.stringify($('Fetch Market Snapshot').item.json) }}\n\nTrade Characteristics:\n{{ JSON.stringify($('Fetch Trade Characteristics').item.json) }}\n\nSimilar Historical Cases:\n{{ JSON.stringify($('Similar Case Retrieval').item.json) }}\n\nSession Context:\n{{ JSON.stringify($('Webhook Trigger').item.json.body.sessionContext) }}\n\nProduce a coherent multi-factor explanation as an ExplanationEnvelope."
+      },
+      "id": "risk-exp-008",
+      "name": "Explanation Synthesizer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'SUCCESS', agentId: 'risk-explainability', tradeId: $('Webhook Trigger').item.json.body.tradeId, explanation: $json.output, correlationId: $('Webhook Trigger').item.json.body.correlationId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "risk-exp-009",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Fetch Risk Result", "type": "main", "index": 0 },
+          { "node": "Fetch Rule Trace", "type": "main", "index": 0 },
+          { "node": "Fetch Market Snapshot", "type": "main", "index": 0 },
+          { "node": "Fetch Trade Characteristics", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Risk Result": {
+      "main": [
+        [{ "node": "Rule Trace Translator", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Rule Trace": {
+      "main": [
+        [{ "node": "Rule Trace Translator", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Market Snapshot": {
+      "main": [
+        [{ "node": "Rule Trace Translator", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Trade Characteristics": {
+      "main": [
+        [{ "node": "Rule Trace Translator", "type": "main", "index": 0 }]
+      ]
+    },
+    "Rule Trace Translator": {
+      "main": [
+        [{ "node": "Similar Case Retrieval", "type": "main", "index": 0 }]
+      ]
+    },
+    "Similar Case Retrieval": {
+      "main": [
+        [{ "node": "Explanation Synthesizer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Explanation Synthesizer": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "risk-explainability" },
+    { "name": "agent" },
+    { "name": "read-only" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}
