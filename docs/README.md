@@ -12,6 +12,27 @@
 | [0005](adr/0005-event-driven-architecture.md) | Event-Driven Architecture with Kafka |
 | [0006](adr/0006-mcp-tool-protocol.md) | MCP Tool Protocol for Agent-Service Communication |
 | [0007](adr/0007-multi-tool-ai-strategy.md) | Multi-Tool AI Development Strategy |
+| [0008](adr/0008-shared-domain-contracts-java-records.md) | Shared Domain Contracts as Java Records |
+| [0009](adr/0009-agent-supervisor-routing.md) | Agent Supervisor Routing Strategy |
+| [0010](adr/0010-agent-hitl-gate-pattern.md) | Agent HITL Gate Pattern |
+| [0011](adr/0011-agent-memory-strategy.md) | Agent Memory Strategy |
+| [0012](adr/0012-agent-model-tier-allocation.md) | Agent Model Tier Allocation |
+| [0013](adr/0013-agent-tool-boundary.md) | Agent Tool Boundary — MCP Protocol |
+| [0014](adr/0014-agent-risk-classification-enforcement.md) | Agent Risk Classification Enforcement |
+| [0015](adr/0015-agent-error-handling.md) | Agent Error Handling Strategy |
+| [0016](adr/0016-agent-evaluation-strategy.md) | Agent Evaluation Strategy |
+| [0017](adr/0017-sidecar-to-agent-communication.md) | Sidecar-to-Agent Communication |
+| [0018](adr/0018-agent-permitted-action-catalogue.md) | Agent Permitted-Action Catalogue |
+| [0019](adr/0019-aws-eks-karpenter.md) | AWS EKS — Karpenter Autoscaling |
+| [0020](adr/0020-aws-aurora-postgresql.md) | AWS Aurora PostgreSQL |
+| [0021](adr/0021-aws-msk-kafka.md) | AWS MSK for Kafka |
+| [0022](adr/0022-aws-elasticache-cluster.md) | AWS ElastiCache Cluster Mode |
+| [0023](adr/0023-aws-neo4j-over-neptune.md) | Neo4j on EKS over Neptune |
+| [0024](adr/0024-azure-aks-for-microservices.md) | Azure AKS for Microservices |
+| [0025](adr/0025-azure-event-hubs-kafka-mode.md) | Azure Event Hubs Kafka Protocol |
+| [0026](adr/0026-azure-cosmos-db-mongodb.md) | Azure Cosmos DB MongoDB API |
+| [0027](adr/0027-azure-cache-for-redis.md) | Azure Cache for Redis |
+| [0028](adr/0028-azure-monitor-observability.md) | Azure Monitor Observability Stack |
 | [0008](adr/0008-shared-domain-contracts-java-records.md) | Java Records for Immutable Domain Types |
 | [0009](adr/0009-trade-ingest-postgresql-sequence.md) | PostgreSQL Sequence for Trade ID Generation |
 | [0010](adr/0010-trade-lifecycle-static-transition-table.md) | Static Transition Table for Trade Lifecycle State Machine |
