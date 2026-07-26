@@ -1,0 +1,305 @@
+{
+  "name": "Specialized — Capacity & Backlog Planning Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "capacity-backlog",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "capacity-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "capacity-backlog-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/getBacklog",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $json.body.region }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "capacity-node-002",
+      "name": "Get Backlog",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8100/mcp/getCompletionEstimate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $('Webhook Trigger').item.json.body.region, backlog: $json }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "capacity-node-003",
+      "name": "Get Completion Estimate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a capacity planner for an FX trade operations platform. Given: (1) current backlog per region, (2) completion estimate vs deadline — determine if deadline is at risk. If yes, identify bottleneck type (CPU, I/O, downstream, partition-skew) and the most effective scaling lever. Consider alternatives: scale-up, defer non-critical, re-prioritize. Produce JSON: { \"deadlineAtRisk\": true/false, \"currentBacklog\": 0, \"estimateMin\": 0, \"deadlineMin\": 0, \"bottleneck\": \"\", \"alternatives\": [], \"recommendedAction\": \"\", \"expectedImprovement\": \"\" }. Never recommend more than 3× current capacity.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Capacity & backlog assessment for region '{{ $('Webhook Trigger').item.json.body.region }}':\n\n- Current backlog: {{ JSON.stringify($('Get Backlog').item.json) }}\n- Completion estimate: {{ JSON.stringify($json) }}\n\nDetermine if the regional deadline is at risk and recommend action."
+      },
+      "id": "capacity-node-004",
+      "name": "Capacity Planner",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "deadlineAtRisk\": true",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "capacity-node-005",
+      "name": "Deadline Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/proposeScalingPlan",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $('Webhook Trigger').item.json.body.region, backlog: $('Get Backlog').item.json, estimate: $('Get Completion Estimate').item.json, analysis: $('Capacity Planner').item.json.output }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "capacity-node-006",
+      "name": "Propose Scaling Plan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1520, 200]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "capacity-approval",
+          "timeout": "20m"
+        }
+      },
+      "id": "capacity-node-007",
+      "name": "Plan Approval Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "capacity-node-008",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2040, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/applyScalingPlan",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ planId: $json.body.planId, region: $('Webhook Trigger').item.json.body.region, approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "H"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "capacity-node-009",
+      "name": "Apply Scaling Plan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 100]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'DENIED', message: 'Scaling plan denied by approver - consider alternatives', region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}"
+      },
+      "id": "capacity-node-010",
+      "name": "Hold Plan",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2300, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ agent: 'capacity-backlog', region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId, backlog: $('Get Backlog').item.json, completionEstimate: $('Get Completion Estimate').item.json, capacityAnalysis: $('Capacity Planner').item.json.output, actionTaken: $json.status || 'SCALED', timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "capacity-node-011",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2560, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Backlog", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Backlog": {
+      "main": [
+        [{ "node": "Get Completion Estimate", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Completion Estimate": {
+      "main": [
+        [{ "node": "Capacity Planner", "type": "main", "index": 0 }]
+      ]
+    },
+    "Capacity Planner": {
+      "main": [
+        [{ "node": "Deadline Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Deadline Check": {
+      "main": [
+        [{ "node": "Propose Scaling Plan", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Propose Scaling Plan": {
+      "main": [
+        [{ "node": "Plan Approval Gate", "type": "main", "index": 0 }]
+      ]
+    },
+    "Plan Approval Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Apply Scaling Plan", "type": "main", "index": 0 }],
+        [{ "node": "Hold Plan", "type": "main", "index": 0 }]
+      ]
+    },
+    "Apply Scaling Plan": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hold Plan": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "capacity-backlog" },
+    { "name": "agent" },
+    { "name": "risk-h" },
+    { "name": "hitl" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

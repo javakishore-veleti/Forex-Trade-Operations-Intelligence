@@ -1,0 +1,343 @@
+{
+  "name": "Specialized — Cutoff Calendar Enforcement Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cutoff-calendar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "cutoff-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "cutoff-calendar-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://business-calendar-service:8085/mcp/getRegionalCutoff",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $json.body.region }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "cutoff-node-002",
+      "name": "Get Regional Cutoff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://business-calendar-service:8085/mcp/getPostCutoffEvents",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $('Webhook Trigger').item.json.body.region, cutoffTime: $json.cutoffTime }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "cutoff-node-003",
+      "name": "Get Post-Cutoff Events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://business-calendar-service:8085/mcp/classifyBookingDate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $('Webhook Trigger').item.json.body.region, events: $json.events, cutoffTime: $('Get Regional Cutoff').item.json.cutoffTime }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "cutoff-node-004",
+      "name": "Classify Booking Date",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://business-calendar-service:8085/mcp/getTradesApproachingCutoff",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $('Webhook Trigger').item.json.body.region, cutoffTime: $('Get Regional Cutoff').item.json.cutoffTime }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "cutoff-node-005",
+      "name": "Get Approaching Cutoff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 420]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a cutoff enforcement analyst for an FX operations platform. Given: (1) regional cutoff time, (2) post-cutoff events with booking date classifications, (3) approaching trades — produce a cutoff report. Identify: trades that would settle on wrong date, DST/holiday edge cases, and approaching-cutoff risks. Recommend holdForNextDay for post-cutoff trades. Never override the calendar service's date classification. Output JSON: { \"postCutoffTrades\": [], \"approachingTrades\": [], \"holdRecommendations\": [], \"edgeCases\": [], \"summary\": \"\" }.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Regional cutoff analysis:\n- Region: {{ $('Webhook Trigger').item.json.body.region }}\n- Cutoff time: {{ $('Get Regional Cutoff').item.json.cutoffTime }}\n- Post-cutoff events: {{ JSON.stringify($('Classify Booking Date').item.json) }}\n- Approaching trades: {{ JSON.stringify($('Get Approaching Cutoff').item.json) }}\n\nAnalyze cutoff violations and produce hold recommendations."
+      },
+      "id": "cutoff-node-006",
+      "name": "Cutoff Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "holdRecommendations\": []",
+              "operator": { "type": "string", "operation": "notContains" }
+            }
+          ]
+        }
+      },
+      "id": "cutoff-node-007",
+      "name": "Hold Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "cutoff-hold-approval",
+          "timeout": "2h"
+        }
+      },
+      "id": "cutoff-node-008",
+      "name": "Hold Approval Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "cutoff-node-009",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2040, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/holdForNextDay",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $('Webhook Trigger').item.json.body.region, tradeIds: $json.body.tradeIds, approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "M"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "cutoff-node-010",
+      "name": "Hold For Next Day",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 100]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'DENIED', message: 'Hold action denied by approver', region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}"
+      },
+      "id": "cutoff-node-011",
+      "name": "Log Denial",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2300, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ agent: 'cutoff-calendar-enforcement', region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId, cutoffAnalysis: $('Cutoff Analyzer').item.json.output, actionTaken: $json.status || 'HELD', timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "cutoff-node-012",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2560, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Regional Cutoff", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Regional Cutoff": {
+      "main": [
+        [
+          { "node": "Get Post-Cutoff Events", "type": "main", "index": 0 },
+          { "node": "Get Approaching Cutoff", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Post-Cutoff Events": {
+      "main": [
+        [{ "node": "Classify Booking Date", "type": "main", "index": 0 }]
+      ]
+    },
+    "Classify Booking Date": {
+      "main": [
+        [{ "node": "Cutoff Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Approaching Cutoff": {
+      "main": [
+        [{ "node": "Cutoff Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Cutoff Analyzer": {
+      "main": [
+        [{ "node": "Hold Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hold Check": {
+      "main": [
+        [{ "node": "Hold Approval Gate", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hold Approval Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Hold For Next Day", "type": "main", "index": 0 }],
+        [{ "node": "Log Denial", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hold For Next Day": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Denial": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "cutoff-calendar" },
+    { "name": "agent" },
+    { "name": "risk-m" },
+    { "name": "hitl" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

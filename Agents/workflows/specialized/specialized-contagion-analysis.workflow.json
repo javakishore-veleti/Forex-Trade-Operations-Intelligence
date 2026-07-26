@@ -1,0 +1,256 @@
+{
+  "name": "Specialized — Contagion Analysis Agent (Blast Radius)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contagion-analysis",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "contagion-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "contagion-analysis-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/findTradeDependencies",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ entity: $json.body.entity, entityType: $json.body.entityType }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "contagion-node-002",
+      "name": "Find Trade Dependencies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 140]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/findAffectedBooks",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ entity: $('Webhook Trigger').item.json.body.entity, entityType: $('Webhook Trigger').item.json.body.entityType }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "contagion-node-003",
+      "name": "Find Affected Books",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/findDownstreamAggregations",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ entity: $('Webhook Trigger').item.json.body.entity, entityType: $('Webhook Trigger').item.json.body.entityType }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "contagion-node-004",
+      "name": "Find Downstream Aggregations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 460]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/findSharedMarketDataDependencies",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ entity: $('Webhook Trigger').item.json.body.entity, entityType: $('Webhook Trigger').item.json.body.entityType }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "contagion-node-005",
+      "name": "Find Shared Dependencies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 620]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/calculateBusinessBlastRadius",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ entity: $('Webhook Trigger').item.json.body.entity, entityType: $('Webhook Trigger').item.json.body.entityType, tradeDependencies: $('Find Trade Dependencies').item.json, affectedBooks: $('Find Affected Books').item.json, downstreamAggregations: $('Find Downstream Aggregations').item.json, sharedDependencies: $('Find Shared Dependencies').item.json }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "contagion-node-006",
+      "name": "Calculate Blast Radius",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a contagion analyst for an FX trade operations platform. Given: (1) affected trades, (2) affected books, (3) downstream aggregations, (4) shared dependencies, (5) blast radius metrics — produce a coherent impact narrative. Classify severity: CRITICAL (>1000 trades or >$1B notional), HIGH (>200 trades), MEDIUM (>50), LOW (≤50). Trace the contagion path from source to impact. Never invent entities. Output JSON: { \"severity\": \"\", \"tradeCount\": 0, \"notional\": 0, \"regions\": [], \"contagionPath\": [], \"sharedRisks\": [], \"narrative\": \"\" }.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Contagion analysis for entity '{{ $('Webhook Trigger').item.json.body.entity }}' (type: {{ $('Webhook Trigger').item.json.body.entityType }}):\n\n- Trade dependencies: {{ JSON.stringify($('Find Trade Dependencies').item.json) }}\n- Affected books: {{ JSON.stringify($('Find Affected Books').item.json) }}\n- Downstream aggregations: {{ JSON.stringify($('Find Downstream Aggregations').item.json) }}\n- Shared market-data dependencies: {{ JSON.stringify($('Find Shared Dependencies').item.json) }}\n- Blast radius metrics: {{ JSON.stringify($('Calculate Blast Radius').item.json) }}\n\nProduce a contagion impact narrative with severity classification."
+      },
+      "id": "contagion-node-007",
+      "name": "Impact Narrator",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ agent: 'contagion-analysis', entity: $('Webhook Trigger').item.json.body.entity, entityType: $('Webhook Trigger').item.json.body.entityType, correlationId: $('Webhook Trigger').item.json.body.correlationId, blastRadius: $('Calculate Blast Radius').item.json, impactNarrative: $json.output, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "contagion-node-008",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1400, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Find Trade Dependencies", "type": "main", "index": 0 },
+          { "node": "Find Affected Books", "type": "main", "index": 0 },
+          { "node": "Find Downstream Aggregations", "type": "main", "index": 0 },
+          { "node": "Find Shared Dependencies", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Find Trade Dependencies": {
+      "main": [
+        [{ "node": "Calculate Blast Radius", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Affected Books": {
+      "main": [
+        [{ "node": "Calculate Blast Radius", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Downstream Aggregations": {
+      "main": [
+        [{ "node": "Calculate Blast Radius", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Shared Dependencies": {
+      "main": [
+        [{ "node": "Calculate Blast Radius", "type": "main", "index": 0 }]
+      ]
+    },
+    "Calculate Blast Radius": {
+      "main": [
+        [{ "node": "Impact Narrator", "type": "main", "index": 0 }]
+      ]
+    },
+    "Impact Narrator": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "contagion-analysis" },
+    { "name": "agent" },
+    { "name": "risk-l" },
+    { "name": "neo4j" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

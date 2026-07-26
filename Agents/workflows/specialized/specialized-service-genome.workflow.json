@@ -1,0 +1,220 @@
+{
+  "name": "Specialized — Service Genome Agent (Fragility Prediction)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "service-genome",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "genome-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "service-genome-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getServiceProfile",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ service: $json.body.service, queryType: $json.body.queryType }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "genome-node-002",
+      "name": "Get Service Profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getDependencies",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ service: $('Webhook Trigger').item.json.body.service }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "genome-node-003",
+      "name": "Get Dependencies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8100/mcp/predictFragility",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ service: $('Webhook Trigger').item.json.body.service, profile: $('Get Service Profile').item.json }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "genome-node-004",
+      "name": "Predict Fragility",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/findConsumersOfChange",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ service: $('Webhook Trigger').item.json.body.service }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "genome-node-005",
+      "name": "Find Change Consumers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 440]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a service architecture analyst for an FX operations platform. Given: (1) service profile, (2) dependency map, (3) fragility score with factors, (4) change consumers — produce a comprehensive genome report. For FRAGILITY queries: explain why the score is what it is, identify the primary risk drivers, recommend safeguards. For PROFILE queries: summarize the service's role and characteristics. For CHANGE_IMPACT queries: describe who is affected and how. Output JSON: { \"service\": \"\", \"profile\": {}, \"fragilityScore\": 0, \"fragilityDrivers\": [], \"consumers\": [], \"recommendations\": [], \"narrative\": \"\" }.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Service genome analysis for '{{ $('Webhook Trigger').item.json.body.service }}' (query type: {{ $('Webhook Trigger').item.json.body.queryType }}):\n\n- Service profile: {{ JSON.stringify($('Get Service Profile').item.json) }}\n- Dependencies: {{ JSON.stringify($('Get Dependencies').item.json) }}\n- Fragility prediction: {{ JSON.stringify($('Predict Fragility').item.json) }}\n- Change consumers: {{ JSON.stringify($('Find Change Consumers').item.json) }}\n\nProduce a comprehensive genome report."
+      },
+      "id": "genome-node-006",
+      "name": "Genome Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1040, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ agent: 'service-genome', service: $('Webhook Trigger').item.json.body.service, queryType: $('Webhook Trigger').item.json.body.queryType, correlationId: $('Webhook Trigger').item.json.body.correlationId, profile: $('Get Service Profile').item.json, fragilityPrediction: $('Predict Fragility').item.json, genomeAnalysis: $json.output, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "genome-node-007",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Service Profile", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Service Profile": {
+      "main": [
+        [
+          { "node": "Get Dependencies", "type": "main", "index": 0 },
+          { "node": "Predict Fragility", "type": "main", "index": 0 },
+          { "node": "Find Change Consumers", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Dependencies": {
+      "main": [
+        [{ "node": "Genome Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Predict Fragility": {
+      "main": [
+        [{ "node": "Genome Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Change Consumers": {
+      "main": [
+        [{ "node": "Genome Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Genome Analyzer": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "service-genome" },
+    { "name": "agent" },
+    { "name": "risk-l" },
+    { "name": "fragility" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

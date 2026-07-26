@@ -1,0 +1,305 @@
+{
+  "name": "Specialized — Adaptive Transaction Routing Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "adaptive-routing",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "routing-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "adaptive-routing-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getRuntimeConditions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $json.body.region, trigger: $json.body.trigger }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "routing-node-002",
+      "name": "Get Runtime Conditions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a transaction routing analyst for an FX operations platform. Given runtime conditions (service health, capacity, cutoff proximity), determine if routing adjustment is warranted. Consider: current error rates, latency vs SLA, queue depths, cutoff time pressure. Produce JSON: { \"adjustmentNeeded\": true/false, \"rationale\": \"\", \"affectedFlows\": [], \"suggestedStrategy\": \"\", \"temporaryDuration\": \"\" }. Do not suggest routing changes that orphan trades.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Runtime conditions for region '{{ $('Webhook Trigger').item.json.body.region }}' (trigger: {{ $('Webhook Trigger').item.json.body.trigger }}):\n\n{{ JSON.stringify($json) }}\n\nAnalyze whether a routing adjustment is warranted and propose a strategy."
+      },
+      "id": "routing-node-003",
+      "name": "Condition Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/proposeRoutingPolicy",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $('Webhook Trigger').item.json.body.region, conditions: $('Get Runtime Conditions').item.json, analysis: $json.output }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "routing-node-004",
+      "name": "Propose Routing Policy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/validateRoutingPolicy",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ policy: $json }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "routing-node-005",
+      "name": "Validate Routing Policy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "true",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "routing-node-006",
+      "name": "Action Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "routing-approval",
+          "timeout": "15m"
+        }
+      },
+      "id": "routing-node-007",
+      "name": "Policy Approval Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "routing-node-008",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2040, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/applyRoutingConfig",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ policyId: $json.body.policyId, region: $('Webhook Trigger').item.json.body.region, approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "H"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "routing-node-009",
+      "name": "Apply Routing Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 100]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'DENIED', message: 'Routing policy denied by approver', region: $('Webhook Trigger').item.json.body.region, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}"
+      },
+      "id": "routing-node-010",
+      "name": "Hold Policy",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2300, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ agent: 'adaptive-routing', region: $('Webhook Trigger').item.json.body.region, trigger: $('Webhook Trigger').item.json.body.trigger, correlationId: $('Webhook Trigger').item.json.body.correlationId, conditionAnalysis: $('Condition Analyzer').item.json.output, policyProposal: $('Propose Routing Policy').item.json, validation: $('Validate Routing Policy').item.json, actionTaken: $json.status || 'APPLIED', timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "routing-node-011",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2560, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Runtime Conditions", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Runtime Conditions": {
+      "main": [
+        [{ "node": "Condition Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Condition Analyzer": {
+      "main": [
+        [{ "node": "Propose Routing Policy", "type": "main", "index": 0 }]
+      ]
+    },
+    "Propose Routing Policy": {
+      "main": [
+        [{ "node": "Validate Routing Policy", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate Routing Policy": {
+      "main": [
+        [{ "node": "Action Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Action Check": {
+      "main": [
+        [{ "node": "Policy Approval Gate", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Policy Approval Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Apply Routing Config", "type": "main", "index": 0 }],
+        [{ "node": "Hold Policy", "type": "main", "index": 0 }]
+      ]
+    },
+    "Apply Routing Config": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hold Policy": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "adaptive-routing" },
+    { "name": "agent" },
+    { "name": "risk-h" },
+    { "name": "hitl" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}
