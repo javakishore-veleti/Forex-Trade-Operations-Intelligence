@@ -66,6 +66,11 @@
 ### Diagrams
 See [diagrams/README.md](diagrams/README.md) for diagramming conventions.
 
+### Use Cases
+| Document | Description |
+|----------|-------------|
+| [use-cases.md](use-cases.md) | 50 platform use cases with personas, agent interactions, and HITL gates |
+
 ### Key Design Documents (repo root)
 | Document | Description |
 |----------|-------------|
