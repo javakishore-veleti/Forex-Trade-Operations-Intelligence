@@ -1,0 +1,370 @@
+{
+  "name": "Specialized — State Divergence Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "state-divergence",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "state-div-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "state-divergence-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/queryTradeState",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $json.body.tradeId, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "state-div-002",
+      "name": "Query Postgres",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getTradeDocument",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "state-div-003",
+      "name": "Get Mongo Doc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getCachedTradeState",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 5000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "state-div-004",
+      "name": "Get Redis Cache",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getLatestDomainEvent",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "state-div-005",
+      "name": "Get Kafka Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 520]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getAnalyticsTradeState",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "state-div-006",
+      "name": "Get Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 660]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/evaluateCanonicalState",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, postgres: $('Query Postgres').item.json, mongo: $('Get Mongo Doc').item.json, redis: $('Get Redis Cache').item.json, kafka: $('Get Kafka Event').item.json, analytics: $('Get Analytics').item.json, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "state-div-007",
+      "name": "Evaluate Canonical State",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 380]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a state integrity analyst for an FX trade platform. Given: (1) per-system state vector, (2) canonical state evaluation with violated invariants and permitted actions — classify each divergence. Categories: STALE_CACHE (Redis behind), EVENT_LAG (Kafka behind), WRITE_FAILURE (system never received update), SCHEMA_MISMATCH (encoding difference), UNKNOWN. For each: identify stale system, staleness duration, business impact. Never determine the authoritative state yourself — trust evaluateCanonicalState. Output JSON: { \"tradeId\": \"\", \"canonicalState\": \"\", \"systemStates\": [], \"divergences\": [], \"businessImpact\": \"\", \"recommendedAction\": \"\", \"permittedActions\": [] }.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=State divergence analysis for trade '{{ $('Webhook Trigger').item.json.body.tradeId }}' (mode: {{ $('Webhook Trigger').item.json.body.mode }}):\n\nPostgres State:\n{{ JSON.stringify($('Query Postgres').item.json) }}\n\nMongoDB Document:\n{{ JSON.stringify($('Get Mongo Doc').item.json) }}\n\nRedis Cache:\n{{ JSON.stringify($('Get Redis Cache').item.json) }}\n\nKafka Latest Event:\n{{ JSON.stringify($('Get Kafka Event').item.json) }}\n\nAnalytics State:\n{{ JSON.stringify($('Get Analytics').item.json) }}\n\nCanonical Evaluation:\n{{ JSON.stringify($json) }}\n\nClassify each divergence and recommend reconciliation action."
+      },
+      "id": "state-div-008",
+      "name": "Divergence Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1000, 380]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output.includes('\"divergences\": []') }}",
+              "rightValue": "false",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "state-div-009",
+      "name": "Divergence Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1260, 380]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "reconciliation-approval",
+          "timeout": "4h"
+        }
+      },
+      "id": "state-div-010",
+      "name": "Reconciliation Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1520, 280]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "state-div-011",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1780, 280]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/startReconciliation",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, action: $json.body.action, approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "state-div-012",
+      "name": "Start Reconciliation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2040, 180]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'DENIED', message: 'Reconciliation denied by approver', tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}"
+      },
+      "id": "state-div-013",
+      "name": "Hold",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2040, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ agent: 'state-divergence', tradeId: $('Webhook Trigger').item.json.body.tradeId, mode: $('Webhook Trigger').item.json.body.mode, correlationId: $('Webhook Trigger').item.json.body.correlationId, divergenceAnalysis: $('Divergence Analyzer').item.json.output, actionTaken: $json.status || 'RECONCILIATION_STARTED', timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "state-div-014",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2300, 380]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Query Postgres", "type": "main", "index": 0 },
+          { "node": "Get Mongo Doc", "type": "main", "index": 0 },
+          { "node": "Get Redis Cache", "type": "main", "index": 0 },
+          { "node": "Get Kafka Event", "type": "main", "index": 0 },
+          { "node": "Get Analytics", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Query Postgres": {
+      "main": [
+        [{ "node": "Evaluate Canonical State", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Mongo Doc": {
+      "main": [
+        [{ "node": "Evaluate Canonical State", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Redis Cache": {
+      "main": [
+        [{ "node": "Evaluate Canonical State", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Kafka Event": {
+      "main": [
+        [{ "node": "Evaluate Canonical State", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Analytics": {
+      "main": [
+        [{ "node": "Evaluate Canonical State", "type": "main", "index": 0 }]
+      ]
+    },
+    "Evaluate Canonical State": {
+      "main": [
+        [{ "node": "Divergence Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Divergence Analyzer": {
+      "main": [
+        [{ "node": "Divergence Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Divergence Check": {
+      "main": [
+        [{ "node": "Reconciliation Gate", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Reconciliation Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Start Reconciliation", "type": "main", "index": 0 }],
+        [{ "node": "Hold", "type": "main", "index": 0 }]
+      ]
+    },
+    "Start Reconciliation": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hold": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "state-divergence" },
+    { "name": "agent" },
+    { "name": "risk-m" },
+    { "name": "hitl" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

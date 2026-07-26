@@ -1,0 +1,310 @@
+{
+  "name": "Specialized — Duplicate Business-Effect Guard Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "duplicate-effect-guard",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "dup-guard-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "duplicate-effect-guard-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/checkIdempotencyConsumed",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ key: $json.body.key, tradeId: $json.body.tradeId, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "dup-guard-002",
+      "name": "Check Idempotency",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8082/mcp/findDoubleBooking",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "dup-guard-003",
+      "name": "Find Double Booking",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8082/mcp/findDuplicateSettlementInstruction",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "dup-guard-004",
+      "name": "Find Duplicate Settlement",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 440]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a transaction integrity analyst for an FX platform. Given: (1) idempotency check result, (2) double-booking results, (3) duplicate settlement check — classify as REAL_DOUBLE_EFFECT (both created financial positions/settlements that should be one) or BENIGN_RETRY (idempotent, no new effect). For REAL_DOUBLE: quantify financial exposure (notional × 2 vs expected), identify which record is the duplicate. For conflicts: explain divergent payloads. Output JSON: { \"classification\": \"\", \"financialExposure\": \"\", \"duplicateRecordId\": \"\", \"explanation\": \"\", \"confidence\": 0.0 }.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Duplicate effect analysis for trade '{{ $('Webhook Trigger').item.json.body.tradeId }}' (key: {{ $('Webhook Trigger').item.json.body.key }}, trigger: {{ $('Webhook Trigger').item.json.body.triggerType }}):\n\nIdempotency Check:\n{{ JSON.stringify($('Check Idempotency').item.json) }}\n\nDouble-Booking Check:\n{{ JSON.stringify($('Find Double Booking').item.json) }}\n\nDuplicate Settlement:\n{{ JSON.stringify($json) }}\n\nClassify as REAL_DOUBLE_EFFECT or BENIGN_RETRY and quantify exposure."
+      },
+      "id": "dup-guard-005",
+      "name": "Effect Classifier",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output.includes('REAL_DOUBLE_EFFECT') }}",
+              "rightValue": "true",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "dup-guard-006",
+      "name": "Real Double Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/reverseDuplicateEffect",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, dryRun: true, analysis: $('Effect Classifier').item.json.output, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "dup-guard-007",
+      "name": "Dry-Run Reversal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, 200]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "reversal-approval",
+          "timeout": "2h"
+        }
+      },
+      "id": "dup-guard-008",
+      "name": "Reversal Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1520, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "dup-guard-009",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/reverseDuplicateEffect",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, dryRun: false, duplicateRecordId: $json.body.duplicateRecordId, approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "dup-guard-010",
+      "name": "Execute Reversal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2040, 100]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'DENIED', message: 'Reversal denied by approver — escalating to manual review', tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}"
+      },
+      "id": "dup-guard-011",
+      "name": "Hold",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2040, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ agent: 'duplicate-effect-guard', tradeId: $('Webhook Trigger').item.json.body.tradeId, key: $('Webhook Trigger').item.json.body.key, correlationId: $('Webhook Trigger').item.json.body.correlationId, classification: $('Effect Classifier').item.json.output, dryRunResult: $('Dry-Run Reversal').item.json || null, actionTaken: $json.status || 'REVERSAL_EXECUTED', timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "dup-guard-012",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2300, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Check Idempotency", "type": "main", "index": 0 },
+          { "node": "Find Double Booking", "type": "main", "index": 0 },
+          { "node": "Find Duplicate Settlement", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check Idempotency": {
+      "main": [
+        [{ "node": "Effect Classifier", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Double Booking": {
+      "main": [
+        [{ "node": "Effect Classifier", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Duplicate Settlement": {
+      "main": [
+        [{ "node": "Effect Classifier", "type": "main", "index": 0 }]
+      ]
+    },
+    "Effect Classifier": {
+      "main": [
+        [{ "node": "Real Double Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Real Double Check": {
+      "main": [
+        [{ "node": "Dry-Run Reversal", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Dry-Run Reversal": {
+      "main": [
+        [{ "node": "Reversal Gate", "type": "main", "index": 0 }]
+      ]
+    },
+    "Reversal Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Execute Reversal", "type": "main", "index": 0 }],
+        [{ "node": "Hold", "type": "main", "index": 0 }]
+      ]
+    },
+    "Execute Reversal": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hold": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "duplicate-effect-guard" },
+    { "name": "agent" },
+    { "name": "risk-h" },
+    { "name": "hitl" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

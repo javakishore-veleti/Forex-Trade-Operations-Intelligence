@@ -1,0 +1,383 @@
+{
+  "name": "Specialized — Transaction Recovery Coordinator Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "transaction-recovery",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "recovery-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "transaction-recovery-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8082/mcp/verifyNoSettlement",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $json.body.tradeId, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "recovery-node-002",
+      "name": "Verify No Settlement",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/checkReplayKey",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "recovery-node-003",
+      "name": "Check Replay Key",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/gatherMultiSystemState",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "recovery-node-004",
+      "name": "Gather State",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 440]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a transaction investigator for an FX platform. Given: settlement status, replay key status, and multi-system state — produce an investigation report. Identify: which system is divergent, what's missing, what likely happened. Output JSON: { \"tradeId\": \"\", \"systemStates\": [], \"divergences\": [], \"probableCause\": \"\", \"canRecover\": true, \"recoveryOptions\": [] }.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Transaction recovery investigation for trade '{{ $('Webhook Trigger').item.json.body.tradeId }}':\n\nSettlement Verification:\n{{ JSON.stringify($('Verify No Settlement').item.json) }}\n\nReplay Key Check:\n{{ JSON.stringify($('Check Replay Key').item.json) }}\n\nMulti-System State:\n{{ JSON.stringify($json) }}\n\nProduce an investigation report identifying divergences and recovery options."
+      },
+      "id": "recovery-node-005",
+      "name": "Investigation LLM",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a recovery planner. Given: investigation report — produce an ordered recovery plan. Each step must be: narrow (one action), idempotent, verifiable. Include pre-conditions, action, expected-post-condition, abort-if. Output JSON: { \"plan\": [{ \"stepId\": 1, \"action\": \"\", \"tool\": \"\", \"params\": {}, \"precondition\": \"\", \"expectedResult\": \"\", \"abortIf\": \"\" }], \"totalSteps\": 0, \"estimatedDurationMin\": 0, \"risks\": [] }.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Based on investigation report for trade '{{ $('Webhook Trigger').item.json.body.tradeId }}':\n\n{{ $json.output }}\n\nProduce an ordered recovery plan with safety checks at each step."
+      },
+      "id": "recovery-node-006",
+      "name": "Recovery Planner LLM",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "recovery-plan-approval",
+          "timeout": "4h"
+        }
+      },
+      "id": "recovery-node-007",
+      "name": "Plan Approval Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "recovery-node-008",
+      "name": "Plan Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/preStepSafetyCheck",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, plan: $('Recovery Planner LLM').item.json.output, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "recovery-node-009",
+      "name": "Safety Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "recovery-step-approval",
+          "timeout": "1h"
+        }
+      },
+      "id": "recovery-node-010",
+      "name": "Step Approval Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2040, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/executeRecoveryStep",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, step: $json.body.stepId || 1, plan: $('Recovery Planner LLM').item.json.output, approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "recovery-node-011",
+      "name": "Execute Step",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/compareState",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, stepResult: $json, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "recovery-node-012",
+      "name": "Verify Post-Condition",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2560, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/closeRecoveryCase",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, verification: $json, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "recovery-node-013",
+      "name": "Close Recovery Case",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2820, 200]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'PLAN_DENIED', message: 'Recovery plan denied by approver', tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}"
+      },
+      "id": "recovery-node-014",
+      "name": "Close Denied",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1780, 420]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ agent: 'transaction-recovery', tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId, investigation: $('Investigation LLM').item.json.output, plan: $('Recovery Planner LLM').item.json.output, actionTaken: $json.status || 'RECOVERY_COMPLETE', timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "recovery-node-015",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3080, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Verify No Settlement", "type": "main", "index": 0 },
+          { "node": "Check Replay Key", "type": "main", "index": 0 },
+          { "node": "Gather State", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Verify No Settlement": {
+      "main": [
+        [{ "node": "Investigation LLM", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Replay Key": {
+      "main": [
+        [{ "node": "Investigation LLM", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gather State": {
+      "main": [
+        [{ "node": "Investigation LLM", "type": "main", "index": 0 }]
+      ]
+    },
+    "Investigation LLM": {
+      "main": [
+        [{ "node": "Recovery Planner LLM", "type": "main", "index": 0 }]
+      ]
+    },
+    "Recovery Planner LLM": {
+      "main": [
+        [{ "node": "Plan Approval Gate", "type": "main", "index": 0 }]
+      ]
+    },
+    "Plan Approval Gate": {
+      "main": [
+        [{ "node": "Plan Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Plan Approval Handler": {
+      "main": [
+        [{ "node": "Safety Check", "type": "main", "index": 0 }],
+        [{ "node": "Close Denied", "type": "main", "index": 0 }]
+      ]
+    },
+    "Safety Check": {
+      "main": [
+        [{ "node": "Step Approval Gate", "type": "main", "index": 0 }]
+      ]
+    },
+    "Step Approval Gate": {
+      "main": [
+        [{ "node": "Execute Step", "type": "main", "index": 0 }]
+      ]
+    },
+    "Execute Step": {
+      "main": [
+        [{ "node": "Verify Post-Condition", "type": "main", "index": 0 }]
+      ]
+    },
+    "Verify Post-Condition": {
+      "main": [
+        [{ "node": "Close Recovery Case", "type": "main", "index": 0 }]
+      ]
+    },
+    "Close Recovery Case": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Close Denied": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "transaction-recovery" },
+    { "name": "agent" },
+    { "name": "risk-h" },
+    { "name": "hitl" },
+    { "name": "multi-phase" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

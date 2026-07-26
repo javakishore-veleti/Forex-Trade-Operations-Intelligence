@@ -1,0 +1,280 @@
+{
+  "name": "Specialized — Retry-Storm & Backpressure Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "retry-storm",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "retry-storm-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "retry-storm-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getRetryAmplification",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ service: $json.body.service, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "retry-storm-002",
+      "name": "Get Retry Amplification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getOpenBreakers",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "retry-storm-003",
+      "name": "Get Open Breakers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getCascadePath",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ service: $('Webhook Trigger').item.json.body.service, retryMetrics: $('Get Retry Amplification').item.json, breakers: $('Get Open Breakers').item.json }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "retry-storm-004",
+      "name": "Get Cascade Path",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a reliability engineer for an FX operations platform. Given: (1) retry amplification metrics, (2) open breaker states, (3) cascade propagation path — identify the ROOT cause service vs symptomatic services. Determine if this is a true storm (sustained > 5× baseline) or transient spike. If true storm: recommend backpressure point (rate-limit vs trip-breaker), affected flows, and recovery estimate. Output JSON: { \"stormConfirmed\": bool, \"rootService\": \"\", \"amplificationFactor\": 0, \"cascadePath\": [], \"affectedFlows\": [], \"recommendedAction\": \"\", \"recoveryEstimateMin\": 0, \"confidence\": 0.0 }.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=Retry storm analysis for service '{{ $('Webhook Trigger').item.json.body.service }}' (alert: {{ $('Webhook Trigger').item.json.body.alertType }}):\n\nRetry Amplification Metrics:\n{{ JSON.stringify($('Get Retry Amplification').item.json) }}\n\nOpen Breakers:\n{{ JSON.stringify($('Get Open Breakers').item.json) }}\n\nCascade Path:\n{{ JSON.stringify($json) }}\n\nDetermine root cause, confirm/deny storm, and recommend backpressure action."
+      },
+      "id": "retry-storm-005",
+      "name": "Root Cause Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output.includes('\"stormConfirmed\": true') || $json.output.includes('\"stormConfirmed\":true') }}",
+              "rightValue": "true",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "retry-storm-006",
+      "name": "Storm Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "backpressure-approval",
+          "timeout": "10m"
+        }
+      },
+      "id": "retry-storm-007",
+      "name": "Backpressure Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1520, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "retry-storm-008",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/applyBackpressure",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ targetService: $json.body.targetService || $('Webhook Trigger').item.json.body.service, action: $json.body.action || 'RATE_LIMIT', approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "retry-storm-009",
+      "name": "Apply Backpressure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2040, 100]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'DENIED', message: 'Backpressure action denied by approver — monitoring continues', service: $('Webhook Trigger').item.json.body.service, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}"
+      },
+      "id": "retry-storm-010",
+      "name": "Hold",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2040, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ agent: 'retry-storm', service: $('Webhook Trigger').item.json.body.service, alertType: $('Webhook Trigger').item.json.body.alertType, correlationId: $('Webhook Trigger').item.json.body.correlationId, analysis: $('Root Cause Analyzer').item.json.output, actionTaken: $json.status || 'BACKPRESSURE_APPLIED', timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "retry-storm-011",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2300, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Get Retry Amplification", "type": "main", "index": 0 },
+          { "node": "Get Open Breakers", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Retry Amplification": {
+      "main": [
+        [{ "node": "Get Cascade Path", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Open Breakers": {
+      "main": [
+        [{ "node": "Get Cascade Path", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Cascade Path": {
+      "main": [
+        [{ "node": "Root Cause Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Root Cause Analyzer": {
+      "main": [
+        [{ "node": "Storm Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Storm Check": {
+      "main": [
+        [{ "node": "Backpressure Gate", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Backpressure Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Apply Backpressure", "type": "main", "index": 0 }],
+        [{ "node": "Hold", "type": "main", "index": 0 }]
+      ]
+    },
+    "Apply Backpressure": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hold": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "retry-storm" },
+    { "name": "agent" },
+    { "name": "risk-h" },
+    { "name": "hitl" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

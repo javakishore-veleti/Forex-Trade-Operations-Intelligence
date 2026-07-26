@@ -1,0 +1,309 @@
+{
+  "name": "Specialized — FinOps Cost-Anomaly Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "finops-cost",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "finops-cost-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "finops-cost-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getCostByService",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ timeRange: $json.body.timeRange, threshold: $json.body.threshold, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "finops-cost-002",
+      "name": "Get Cost By Service",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/correlateCostToDeploy",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ costs: $json, timeRange: $('Webhook Trigger').item.json.body.timeRange, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "finops-cost-003",
+      "name": "Correlate Cost to Deploy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/getIdleCapacity",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ timeRange: $('Webhook Trigger').item.json.body.timeRange, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "finops-cost-004",
+      "name": "Get Idle Capacity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 420]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a FinOps analyst for an FX trade operations platform. Given: (1) per-service cost data, (2) cost-to-deploy correlations, (3) idle capacity — determine if cost anomalies are deployment-driven (unexpected) or volume-driven (expected). For unexpected: identify the deployment and explain the causal mechanism. For idle: recommend rightsizing with SLA risk assessment. Output JSON: { \"anomalies\": [], \"correlations\": [], \"volumeDriven\": [], \"idleResources\": [], \"recommendations\": [], \"estimatedSavings\": \"\", \"summary\": \"\" }.",
+          "temperature": 0.1
+        },
+        "promptType": "define",
+        "text": "=FinOps cost analysis (timeRange: {{ $('Webhook Trigger').item.json.body.timeRange }}):\n\nCost By Service:\n{{ JSON.stringify($('Get Cost By Service').item.json) }}\n\nDeploy Correlations:\n{{ JSON.stringify($('Correlate Cost to Deploy').item.json) }}\n\nIdle Capacity:\n{{ JSON.stringify($json) }}\n\nIdentify anomalies, correlate with deploys, and recommend rightsizing actions."
+      },
+      "id": "finops-cost-005",
+      "name": "Cost Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output.includes('\"recommendations\": []') }}",
+              "rightValue": "false",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "finops-cost-006",
+      "name": "Action Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/proposeRightsizing",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ analysis: $('Cost Analyzer').item.json.output, timeRange: $('Webhook Trigger').item.json.body.timeRange, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "finops-cost-007",
+      "name": "Propose Rightsizing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1520, 200]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "finops-approval",
+          "timeout": "24h"
+        }
+      },
+      "id": "finops-cost-008",
+      "name": "Scale Approval Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "finops-cost-009",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2040, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8087/mcp/applyScaleDown",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ proposalId: $json.body.proposalId, approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "finops-cost-010",
+      "name": "Apply Scale Down",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 100]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'DENIED', message: 'Scale-down proposal denied by approver', correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}"
+      },
+      "id": "finops-cost-011",
+      "name": "Hold",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2300, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ agent: 'finops-cost', timeRange: $('Webhook Trigger').item.json.body.timeRange, correlationId: $('Webhook Trigger').item.json.body.correlationId, costAnalysis: $('Cost Analyzer').item.json.output, proposal: $('Propose Rightsizing').item.json || null, actionTaken: $json.status || 'SCALE_DOWN_APPLIED', timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "finops-cost-012",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2560, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Cost By Service", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Cost By Service": {
+      "main": [
+        [
+          { "node": "Correlate Cost to Deploy", "type": "main", "index": 0 },
+          { "node": "Get Idle Capacity", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Correlate Cost to Deploy": {
+      "main": [
+        [{ "node": "Cost Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Idle Capacity": {
+      "main": [
+        [{ "node": "Cost Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Cost Analyzer": {
+      "main": [
+        [{ "node": "Action Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Action Check": {
+      "main": [
+        [{ "node": "Propose Rightsizing", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Propose Rightsizing": {
+      "main": [
+        [{ "node": "Scale Approval Gate", "type": "main", "index": 0 }]
+      ]
+    },
+    "Scale Approval Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Apply Scale Down", "type": "main", "index": 0 }],
+        [{ "node": "Hold", "type": "main", "index": 0 }]
+      ]
+    },
+    "Apply Scale Down": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hold": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "finops-cost" },
+    { "name": "agent" },
+    { "name": "risk-h" },
+    { "name": "hitl" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

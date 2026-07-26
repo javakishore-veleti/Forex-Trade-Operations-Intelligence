@@ -241,7 +241,7 @@ All implemented as n8n workflow JSON exports only. No Python agent scripts.
 |---|---|---|
 | `07-n8n-agents/01-supervisor-agent` | ✅ Requirements done | Intent classification, sub-agent routing, session memory, multi-turn conversation |
 | `07-n8n-agents/02-trade-lifecycle-agent` | ✅ Requirements done | Timeline reconstruction, gap/duplicate detection, probable cause, safe action |
-| `07-n8n-agents/03-state-divergence-agent` | ⬜ Not started | Cross-system state comparison, HITL reconciliation |
+| `07-n8n-agents/34-state-divergence-agent` | ✅ Requirements ✅ Design ✅ Tasks ✅ Implemented | Cross-system state comparison, HITL reconciliation |
 | `07-n8n-agents/04-event-integrity-agent` | ⬜ Not started | Sequence violation handling, quarantine/pause/replay |
 | `07-n8n-agents/05-risk-explainability-agent` | ✅ Requirements ✅ Design ✅ Tasks | Multi-factor risk explanation, rule-trace readable, follow-up Q&A |
 | `07-n8n-agents/06-rule-impact-agent` | ✅ Requirements ✅ Design ✅ Tasks | Drools firing anomaly, pre/post deploy comparison, rollback gate |
@@ -268,11 +268,11 @@ All implemented as n8n workflow JSON exports only. No Python agent scripts.
 | `07-n8n-agents/27-service-genome-agent` | ✅ Requirements ✅ Design ✅ Tasks | Service knowledge profile, fragility prediction |
 | `07-n8n-agents/28-adaptive-routing-agent` | ✅ Requirements ✅ Design ✅ Tasks | Runtime routing policy proposal, rules validation, HITL apply |
 | `07-n8n-agents/29-capacity-backlog-agent` | ✅ Requirements ✅ Design ✅ Tasks | Backlog vs deadline, replica scaling proposal |
-| `07-n8n-agents/30-retry-storm-agent` | ✅ Requirements ✅ Design ✅ Tasks | Retry amplification, breaker cascade, HITL backpressure |
-| `07-n8n-agents/31-finops-cost-agent` | ✅ Requirements ✅ Design ✅ Tasks | Cost anomaly, deploy-to-cost correlation, rightsizing |
-| `07-n8n-agents/32-trade-amendment-ripple-agent` | ✅ Requirements ✅ Design ✅ Tasks | Downstream effect tracking for amendments/cancellations |
-| `07-n8n-agents/33-duplicate-effect-guard` | ✅ Requirements ✅ Design ✅ Tasks | Double-booking/settlement detection, dry-run reversal |
-| `07-n8n-agents/34-transaction-recovery-agent` | ✅ Requirements ✅ Design ✅ Tasks | Investigation → Planning → Safety → Execution → Audit |
+| `07-n8n-agents/30-retry-storm-agent` | ✅ Requirements ✅ Design ✅ Tasks ✅ Implemented | Retry amplification, breaker cascade, HITL backpressure |
+| `07-n8n-agents/31-finops-cost-agent` | ✅ Requirements ✅ Design ✅ Tasks ✅ Implemented | Cost anomaly, deploy-to-cost correlation, rightsizing |
+| `07-n8n-agents/32-trade-amendment-ripple-agent` | ✅ Requirements ✅ Design ✅ Tasks ✅ Implemented | Downstream effect tracking for amendments/cancellations |
+| `07-n8n-agents/33-duplicate-effect-guard` | ✅ Requirements ✅ Design ✅ Tasks ✅ Implemented | Double-booking/settlement detection, dry-run reversal |
+| `07-n8n-agents/34-transaction-recovery-agent` | ✅ Requirements ✅ Design ✅ Tasks ✅ Implemented | Investigation → Planning → Safety → Execution → Audit |
 
 ---
 

@@ -1,0 +1,310 @@
+{
+  "name": "Specialized — Trade Amendment Ripple Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trade-amendment-ripple",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ripple-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "trade-amendment-ripple-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8082/mcp/findDownstreamEffects",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $json.body.tradeId, eventType: $json.body.eventType, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "ripple-node-002",
+      "name": "Find Downstream Effects",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/checkRiskRecalcTriggered",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "ripple-node-003",
+      "name": "Check Risk Recalc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8082/mcp/checkSettlementWithdrawn",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "ripple-node-004",
+      "name": "Check Settlement",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8085/mcp/checkReportAmended",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "ripple-node-005",
+      "name": "Check Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 440]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a trade operations analyst for an FX platform. Given: (1) expected downstream effects, (2) check results for risk/settlement/reporting — identify gaps where expected reactions did not occur. For each gap: explain likely cause (lag/missing event/failure), quantify business impact, and recommend correction. Produce JSON: { \"tradeId\": \"\", \"eventType\": \"\", \"expectedEffects\": [], \"confirmedEffects\": [], \"gaps\": [], \"businessImpact\": \"\", \"corrections\": [], \"summary\": \"\" }.",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Trade amendment ripple analysis for trade '{{ $('Webhook Trigger').item.json.body.tradeId }}' (event: {{ $('Webhook Trigger').item.json.body.eventType }}):\n\nExpected Downstream Effects:\n{{ JSON.stringify($('Find Downstream Effects').item.json) }}\n\nRisk Recalc Check:\n{{ JSON.stringify($('Check Risk Recalc').item.json) }}\n\nSettlement Check:\n{{ JSON.stringify($('Check Settlement').item.json) }}\n\nReport Check:\n{{ JSON.stringify($json) }}\n\nIdentify gaps and recommend corrections."
+      },
+      "id": "ripple-node-006",
+      "name": "Ripple Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output.includes('\"gaps\": []') }}",
+              "rightValue": "false",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "ripple-node-007",
+      "name": "Gap Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "ripple-correction",
+          "timeout": "4h"
+        }
+      },
+      "id": "ripple-node-008",
+      "name": "Correction Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1520, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "ripple-node-009",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://risk-calculation-service:8083/mcp/requestMissingRecalc",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, corrections: $json.body.corrections, approverUserId: $json.body.approverUserId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Correlation-Id", "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}" }
+          ]
+        }
+      },
+      "id": "ripple-node-010",
+      "name": "Request Recalc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2040, 100]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'DENIED', message: 'Correction denied by approver', tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}"
+      },
+      "id": "ripple-node-011",
+      "name": "Hold",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2040, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ agent: 'trade-amendment-ripple', tradeId: $('Webhook Trigger').item.json.body.tradeId, eventType: $('Webhook Trigger').item.json.body.eventType, correlationId: $('Webhook Trigger').item.json.body.correlationId, rippleAnalysis: $('Ripple Analyzer').item.json.output, actionTaken: $json.status || 'CORRECTIONS_APPLIED', timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ripple-node-012",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2300, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Find Downstream Effects", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Downstream Effects": {
+      "main": [
+        [
+          { "node": "Check Risk Recalc", "type": "main", "index": 0 },
+          { "node": "Check Settlement", "type": "main", "index": 0 },
+          { "node": "Check Report", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check Risk Recalc": {
+      "main": [
+        [{ "node": "Ripple Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Settlement": {
+      "main": [
+        [{ "node": "Ripple Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Report": {
+      "main": [
+        [{ "node": "Ripple Analyzer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ripple Analyzer": {
+      "main": [
+        [{ "node": "Gap Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gap Check": {
+      "main": [
+        [{ "node": "Correction Gate", "type": "main", "index": 0 }],
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Correction Gate": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Request Recalc", "type": "main", "index": 0 }],
+        [{ "node": "Hold", "type": "main", "index": 0 }]
+      ]
+    },
+    "Request Recalc": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hold": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "trade-amendment-ripple" },
+    { "name": "agent" },
+    { "name": "risk-m" },
+    { "name": "hitl" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}
