@@ -12,8 +12,55 @@
     </parent>
 
     <artifactId>shared-domain-contracts</artifactId>
+    <packaging>jar</packaging>
     <name>Shared Domain Contracts</name>
-    <description>Shared library artifact containing MCP Tool Contract DTOs and domain value objects. Not a runnable application.</description>
+    <description>Shared library artifact containing domain types, enums, and value objects. Not a runnable application.</description>
+
+    <dependencies>
+        <!-- Compile scope: Jackson serialization -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!-- Compile scope: Jakarta Bean Validation API -->
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+
+        <!-- Test scope: Hibernate Validator (runtime implementation) -->
+        <dependency>
+            <groupId>org.hibernate.validator</groupId>
+            <artifactId>hibernate-validator</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Hibernate Validator requires an EL implementation -->
+        <dependency>
+            <groupId>org.glassfish.expressly</groupId>
+            <artifactId>expressly</artifactId>
+            <version>5.0.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Test scope: JUnit 5 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Test scope: jqwik property-based testing -->
+        <dependency>
+            <groupId>net.jqwik</groupId>
+            <artifactId>jqwik</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
     <!-- No spring-boot-maven-plugin repackage — this is a plain library JAR -->
 </project>

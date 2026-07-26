@@ -177,7 +177,7 @@ Each is a standalone Spring Boot Maven module under `Middleware/`. Built as plai
 
 | Spec | Status | Scope |
 |---|---|---|
-| `02-microservices/01-shared-domain-contracts` | ✅ Requirements done | Shared Java library: Trade, TradeEvent, RiskResult, Region, TradingBook, Counterparty, Money, AuditInfo DTOs + all enums (TradeStatus, TradeEventType, RegionCode, RiskLevel etc.) |
+| `02-microservices/01-shared-domain-contracts` | ✅ Requirements ✅ Design ✅ Tasks ✅ Implemented | Shared Java library: Trade, TradeEvent, RiskResult, Region, TradingBook, Counterparty, Money, AuditInfo DTOs + all enums (TradeStatus, TradeEventType, RegionCode, RiskLevel etc.) |
 | `02-microservices/02-trade-ingest-service` | ✅ Requirements done | REST trade capture endpoint, input validation, idempotency check, Postgres write, publishes TradeCaptured event to Kafka |
 | `02-microservices/03-trade-lifecycle-service` | ✅ Requirements done | Trade state machine (CAPTURED→SETTLED), lifecycle transition rules, audit history, Postgres + MongoDB read/write, state query APIs |
 | `02-microservices/04-risk-calculation-service` | ✅ Requirements done | Currency pair risk calculation, Drools rules engine integration, regional/book/global aggregation, EOD risk totals, limit checking, RiskCalculationCompleted event |
