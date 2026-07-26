@@ -1,0 +1,26 @@
+{
+  "index_patterns": ["fxops-services-*", "fxops-kafka-*"],
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "index.lifecycle.name": "fxops-log-retention",
+    "index.lifecycle.rollover_alias": "fxops-logs"
+  },
+  "mappings": {
+    "properties": {
+      "@timestamp": { "type": "date" },
+      "level": { "type": "keyword" },
+      "service": { "type": "keyword" },
+      "traceId": { "type": "keyword" },
+      "spanId": { "type": "keyword" },
+      "correlationId": { "type": "keyword" },
+      "tradeId": { "type": "keyword" },
+      "regionCode": { "type": "keyword" },
+      "logger": { "type": "keyword" },
+      "log_message": { "type": "text" },
+      "exception": { "type": "text" },
+      "environment": { "type": "keyword" },
+      "container_name": { "type": "keyword" }
+    }
+  }
+}

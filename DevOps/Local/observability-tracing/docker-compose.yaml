@@ -1,0 +1,44 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.104.0
+    container_name: fxops-otel-collector
+    command: ["--config=/etc/otel-config.yaml"]
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8888:8888"   # Collector metrics
+    volumes:
+      - ./otel-config.yaml:/etc/otel-config.yaml:ro
+    networks:
+      - fxops-tracing-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:13133/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      jaeger:
+        condition: service_healthy
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.58.1
+    container_name: fxops-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14250:14250"  # gRPC (model.proto)
+    networks:
+      - fxops-tracing-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:14269/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  fxops-jaeger-data:
+
+networks:
+  fxops-tracing-net:
+    driver: bridge

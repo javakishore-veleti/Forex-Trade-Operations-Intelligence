@@ -6,6 +6,7 @@ services:
       discovery.type: single-node
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      cluster.name: fxops-logging
     ports:
       - "9200:9200"
     volumes:
@@ -23,6 +24,10 @@ services:
     container_name: fxops-logstash
     ports:
       - "5044:5044"
+      - "5000:5000/tcp"
+      - "5000:5000/udp"
+    volumes:
+      - ./logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
     networks:
       - fxops-logging-net
     depends_on:
@@ -39,8 +44,12 @@ services:
     container_name: fxops-kibana
     environment:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      SERVER_NAME: fxops-kibana
     ports:
       - "5601:5601"
+    volumes:
+      - ./kibana/saved-objects:/usr/share/kibana/saved-objects:ro
+      - ./kibana/index-patterns:/usr/share/kibana/index-patterns:ro
     networks:
       - fxops-logging-net
     depends_on:

@@ -1,0 +1,117 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Request Rate (req/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{service=\"trade-lifecycle-service\"}[2m]))",
+          "legendFormat": "Requests/s"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{service=\"trade-lifecycle-service\",status=~\"5..\"}[2m])) / sum(rate(http_server_requests_seconds_count{service=\"trade-lifecycle-service\"}[2m])) * 100",
+          "legendFormat": "Error %"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    },
+    {
+      "title": "Latency (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{service=\"trade-lifecycle-service\"}[2m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{service=\"trade-lifecycle-service\"}[2m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{service=\"trade-lifecycle-service\"}[2m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "title": "Lifecycle Transitions (from → to)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(lifecycle_transitions_total{service=\"trade-lifecycle-service\"}[2m])) by (from, to) * 60",
+          "legendFormat": "{{ from }} → {{ to }}"
+        }
+      ]
+    },
+    {
+      "title": "Illegal Transition Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(lifecycle_illegal_transitions_total{service=\"trade-lifecycle-service\"}[2m])) * 60",
+          "legendFormat": "Illegal/min"
+        }
+      ]
+    },
+    {
+      "title": "Duplicate Event Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(lifecycle_duplicate_events_total{service=\"trade-lifecycle-service\"}[2m])) * 60",
+          "legendFormat": "Duplicates/min"
+        }
+      ]
+    },
+    {
+      "title": "JVM Heap Memory",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{service=\"trade-lifecycle-service\",area=\"heap\"}",
+          "legendFormat": "{{ id }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "title": "GC Pause Duration",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_pause_seconds_sum{service=\"trade-lifecycle-service\"}[2m])",
+          "legendFormat": "{{ action }} {{ cause }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["fxops", "trade-lifecycle-service"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "FX Operations - Trade Lifecycle Service",
+  "uid": "fxops-trade-lifecycle",
+  "version": 1
+}

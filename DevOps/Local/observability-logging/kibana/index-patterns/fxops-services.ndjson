@@ -1,0 +1,1 @@
+{"attributes":{"title":"fxops-services-*","timeFieldName":"@timestamp","fields":"[]","fieldFormatMap":"{}","runtimeFieldMap":"{}"},"id":"fxops-services-*","type":"index-pattern","references":[],"version":"1"}

@@ -31,6 +31,7 @@
         <testcontainers.version>1.20.4</testcontainers.version>
         <jqwik.version>1.9.2</jqwik.version>
         <kafka.version>3.8.0</kafka.version>
+        <opentelemetry-javaagent.version>2.6.0</opentelemetry-javaagent.version>
     </properties>
 
     <dependencyManagement>
@@ -65,6 +66,13 @@
                 <artifactId>jqwik</artifactId>
                 <version>${jqwik.version}</version>
                 <scope>test</scope>
+            </dependency>
+            <!-- OpenTelemetry Java Agent (OBSERVABILITY_TRACING) — attached at JVM startup via -javaagent -->
+            <dependency>
+                <groupId>io.opentelemetry.javaagent</groupId>
+                <artifactId>opentelemetry-javaagent</artifactId>
+                <version>${opentelemetry-javaagent.version}</version>
+                <scope>provided</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -1,0 +1,1 @@
+{"attributes":{"title":"fxops-kafka-*","timeFieldName":"@timestamp","fields":"[]","fieldFormatMap":"{}","runtimeFieldMap":"{}"},"id":"fxops-kafka-*","type":"index-pattern","references":[],"version":"1"}

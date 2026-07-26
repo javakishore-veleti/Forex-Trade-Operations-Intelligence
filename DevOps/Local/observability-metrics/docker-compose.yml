@@ -2,9 +2,15 @@ services:
   prometheus:
     image: prom/prometheus:v2.54.0
     container_name: fxops-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
     ports:
       - "9090:9090"
     volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts/alert-rules.yml:/etc/prometheus/alerts/alert-rules.yml:ro
       - fxops-prometheus-data:/prometheus
     networks:
       - fxops-metrics-net
@@ -20,12 +26,19 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: fxops
       GF_SECURITY_ADMIN_PASSWORD: fxops_local_dev
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/platform-dashboard.json
     ports:
       - "3000:3000"
     volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
       - fxops-grafana-data:/var/lib/grafana
     networks:
       - fxops-metrics-net
+    depends_on:
+      prometheus:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
       interval: 10s

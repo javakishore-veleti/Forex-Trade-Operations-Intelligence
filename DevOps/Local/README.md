@@ -12,6 +12,7 @@ Docker Compose configurations for the FX Trade Operations Intelligence local dev
 | Graph Store | `graph-store/` | `neo4j:5.23` | 7474, 7687 | `fxops-graph-net` |
 | Event Stream | `event-stream/` | `apache/kafka:3.8.0` | 9092 | `fxops-event-net` |
 | Agent Platform | `agent-platform/` | `n8nio/n8n:1.55.0` | 5678 | `fxops-agent-net` |
+| Observability Tracing | `observability-tracing/` | `otel/opentelemetry-collector-contrib:0.104.0`, `jaegertracing/all-in-one:1.58.1` | 4317, 4318, 16686 | `fxops-tracing-net` |
 | Observability Logging | `observability-logging/` | `elasticsearch/logstash/kibana:8.15.0` | 9200, 5044, 5601 | `fxops-logging-net` |
 | Observability Metrics | `observability-metrics/` | `prom/prometheus:v2.54.0`, `grafana/grafana:11.1.0` | 9090, 3000 | `fxops-metrics-net` |
 

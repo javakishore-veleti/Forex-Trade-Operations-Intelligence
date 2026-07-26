@@ -1,0 +1,81 @@
+groups:
+  - name: fxops-service-health
+    rules:
+      # Alert: Service error rate exceeds 5% for more than 2 minutes
+      - alert: HighServiceErrorRate
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[2m])) by (service)
+            /
+            sum(rate(http_server_requests_seconds_count[2m])) by (service)
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "Service {{ $labels.service }} has an error rate of {{ printf \"%.2f\" $value | float64 }}% (threshold: 5%) for more than 2 minutes."
+
+  - name: fxops-dlq-health
+    rules:
+      # Alert: DLQ depth exceeds threshold for more than 5 minutes
+      - alert: DLQDepthHigh
+        expr: dlq_depth > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "DLQ depth high on topic {{ $labels.topic }}"
+          description: "DLQ topic {{ $labels.topic }} has {{ $value }} messages queued (threshold: 10) for more than 5 minutes."
+
+      # Alert: Poison message quarantined (fires immediately)
+      - alert: PoisonMessageQuarantined
+        expr: increase(dlq_poison_message_count[1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Poison message quarantined from {{ $labels.origin_topic }}"
+          description: "A poison message has been quarantined from topic {{ $labels.origin_topic }}. Trade ID: {{ $labels.trade_id }}. Immediate investigation required."
+
+  - name: fxops-risk-sla
+    rules:
+      # Alert: Risk calculation p95 latency exceeds SLA threshold
+      - alert: RiskCalculationLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(risk_calculation_duration_seconds_bucket[5m])) by (le, service)) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: risk
+        annotations:
+          summary: "Risk calculation p95 latency exceeds 2s SLA"
+          description: "The p95 latency for risk calculations is {{ printf \"%.2f\" $value }}s (SLA threshold: 2s) for more than 5 minutes."
+
+  - name: fxops-eod-health
+    rules:
+      # Alert: EOD region blocked for more than 30 minutes
+      - alert: EODRegionBlocked
+        expr: eod_region_close_status == 2
+        for: 30m
+        labels:
+          severity: critical
+          team: operations
+        annotations:
+          summary: "EOD BLOCKED for region {{ $labels.region_code }}"
+          description: "Region {{ $labels.region_code }} has been in BLOCKED state for more than 30 minutes. Blocker: {{ $labels.blocker_code }}. Manual intervention may be required."
+
+  - name: fxops-sequence-health
+    rules:
+      # Alert: Sequence violations exceeding rate threshold
+      - alert: SequenceViolationRateHigh
+        expr: sum(rate(sequence_violations_total[2m])) by (violation_type) > 0.1667
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High sequence violation rate: {{ $labels.violation_type }}"
+          description: "Sequence violations of type {{ $labels.violation_type }} are occurring at more than 10 per minute (sustained for 2 minutes)."
