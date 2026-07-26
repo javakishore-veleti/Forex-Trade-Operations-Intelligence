@@ -243,36 +243,36 @@ All implemented as n8n workflow JSON exports only. No Python agent scripts.
 | `07-n8n-agents/02-trade-lifecycle-agent` | ✅ Requirements done | Timeline reconstruction, gap/duplicate detection, probable cause, safe action |
 | `07-n8n-agents/03-state-divergence-agent` | ⬜ Not started | Cross-system state comparison, HITL reconciliation |
 | `07-n8n-agents/04-event-integrity-agent` | ⬜ Not started | Sequence violation handling, quarantine/pause/replay |
-| `07-n8n-agents/05-risk-explainability-agent` | ⬜ Not started | Multi-factor risk explanation, rule-trace readable, follow-up Q&A |
-| `07-n8n-agents/06-rule-impact-agent` | ⬜ Not started | Drools firing anomaly, pre/post deploy comparison, rollback gate |
-| `07-n8n-agents/07-rule-coverage-agent` | ⬜ Not started | Currency-pair coverage matrix, fallback firing rate, uncovered pair detection |
-| `07-n8n-agents/08-shadow-rule-simulator` | ⬜ Not started | NL→DRL, shadow pod replay, impact diff, HITL deploy gate |
-| `07-n8n-agents/09-counterparty-exposure-agent` | ⬜ Not started | Live exposure narrative, Neo4j traversal, limit comparison |
-| `07-n8n-agents/10-eod-readiness-agent` | ⬜ Not started | Regional sub-agents + global supervisor, go/no-go, HITL exception approval |
-| `07-n8n-agents/11-data-freshness-agent` | ⬜ Not started | Pre-process freshness gate, BLOCK/ACCEPT per dataset |
-| `07-n8n-agents/12-exception-materiality-agent` | ⬜ Not started | Materiality classification, global-close blockers vs tolerable |
-| `07-n8n-agents/13-settlement-fail-predictor` | ⬜ Not started | Pre-settlement risk, nostro shortfall, missing SSI |
-| `07-n8n-agents/14-databricks-lineage-agent` | ⬜ Not started | Unity Catalog lineage, job failure impact, aggregation gate |
-| `07-n8n-agents/15-regulatory-reporting-agent` | ⬜ Not started | Completeness attestation, gap detection, resubmit gate |
-| `07-n8n-agents/16-business-kpi-guard` | ⬜ Not started | KPI anomaly, calendar-aware baseline, LLM only after anomaly |
-| `07-n8n-agents/17-change-correlation-agent` | ⬜ Not started | Deploys + rule changes correlated to business outcome shifts |
-| `07-n8n-agents/18-canary-probe-agent` | ✅ Requirements done | Synthetic trade injection, per-stage liveness assertion |
-| `07-n8n-agents/19-trace-latency-agent` | ⬜ Not started | OTel per-stage latency, SLA breach root cause |
-| `07-n8n-agents/20-runtime-intent-agent` | ⬜ Not started | Behavioral clustering, suppress false alarms |
+| `07-n8n-agents/05-risk-explainability-agent` | ✅ Requirements ✅ Design ✅ Tasks | Multi-factor risk explanation, rule-trace readable, follow-up Q&A |
+| `07-n8n-agents/06-rule-impact-agent` | ✅ Requirements ✅ Design ✅ Tasks | Drools firing anomaly, pre/post deploy comparison, rollback gate |
+| `07-n8n-agents/07-rule-coverage-agent` | ✅ Requirements ✅ Design ✅ Tasks | Currency-pair coverage matrix, fallback firing rate, uncovered pair detection |
+| `07-n8n-agents/08-shadow-rule-simulator` | ✅ Requirements ✅ Design ✅ Tasks | NL→DRL, shadow pod replay, impact diff, HITL deploy gate |
+| `07-n8n-agents/09-counterparty-exposure-agent` | ✅ Requirements ✅ Design ✅ Tasks | Live exposure narrative, Neo4j traversal, limit comparison |
+| `07-n8n-agents/10-eod-readiness-agent` | ✅ Requirements ✅ Design ✅ Tasks | Regional sub-agents + global supervisor, go/no-go, HITL exception approval |
+| `07-n8n-agents/11-data-freshness-agent` | ✅ Requirements ✅ Design ✅ Tasks | Pre-process freshness gate, BLOCK/ACCEPT per dataset |
+| `07-n8n-agents/12-exception-materiality-agent` | ✅ Requirements ✅ Design ✅ Tasks | Materiality classification, global-close blockers vs tolerable |
+| `07-n8n-agents/13-settlement-fail-predictor` | ✅ Requirements ✅ Design ✅ Tasks | Pre-settlement risk, nostro shortfall, missing SSI |
+| `07-n8n-agents/14-databricks-lineage-agent` | ✅ Requirements ✅ Design ✅ Tasks | Unity Catalog lineage, job failure impact, aggregation gate |
+| `07-n8n-agents/15-regulatory-reporting-agent` | ✅ Requirements ✅ Design ✅ Tasks | Completeness attestation, gap detection, resubmit gate |
+| `07-n8n-agents/16-business-kpi-guard` | ✅ Requirements ✅ Design ✅ Tasks | KPI anomaly, calendar-aware baseline, LLM only after anomaly |
+| `07-n8n-agents/17-change-correlation-agent` | ✅ Requirements ✅ Design ✅ Tasks | Deploys + rule changes correlated to business outcome shifts |
+| `07-n8n-agents/18-canary-probe-agent` | ✅ Requirements ✅ Design ✅ Tasks | Synthetic trade injection, per-stage liveness assertion |
+| `07-n8n-agents/19-trace-latency-agent` | ✅ Requirements ✅ Design ✅ Tasks | OTel per-stage latency, SLA breach root cause |
+| `07-n8n-agents/20-runtime-intent-agent` | ✅ Requirements ✅ Design ✅ Tasks | Behavioral clustering, suppress false alarms |
 | `07-n8n-agents/21-dlq-triage-agent` | ✅ Requirements done | DLQ trigger, signature grouping, auto-replay vs quarantine |
-| `07-n8n-agents/22-consumer-lag-predictor` | ⬜ Not started | Completion forecast vs cutoff, HITL scale approval |
-| `07-n8n-agents/23-market-data-staleness-agent` | ⬜ Not started | Feed freshness, crossed-quote detection, blockRiskCalc gate |
-| `07-n8n-agents/24-schema-contract-drift-agent` | ⬜ Not started | Schema compatibility, consumer impact, breaking-change flag |
-| `07-n8n-agents/25-cutoff-calendar-agent` | ⬜ Not started | Post-cutoff event detection, holdForNextDay gate |
-| `07-n8n-agents/26-contagion-analysis-agent` | ⬜ Not started | Neo4j blast radius — trades/books/regions affected |
-| `07-n8n-agents/27-service-genome-agent` | ⬜ Not started | Service knowledge profile, fragility prediction |
-| `07-n8n-agents/28-adaptive-routing-agent` | ⬜ Not started | Runtime routing policy proposal, rules validation, HITL apply |
-| `07-n8n-agents/29-capacity-backlog-agent` | ⬜ Not started | Backlog vs deadline, replica scaling proposal |
-| `07-n8n-agents/30-retry-storm-agent` | ⬜ Not started | Retry amplification, breaker cascade, HITL backpressure |
-| `07-n8n-agents/31-finops-cost-agent` | ⬜ Not started | Cost anomaly, deploy-to-cost correlation, rightsizing |
-| `07-n8n-agents/32-trade-amendment-ripple-agent` | ⬜ Not started | Downstream effect tracking for amendments/cancellations |
-| `07-n8n-agents/33-duplicate-effect-guard` | ⬜ Not started | Double-booking/settlement detection, dry-run reversal |
-| `07-n8n-agents/34-transaction-recovery-agent` | ⬜ Not started | Investigation → Planning → Safety → Execution → Audit |
+| `07-n8n-agents/22-consumer-lag-predictor` | ✅ Requirements ✅ Design ✅ Tasks | Completion forecast vs cutoff, HITL scale approval |
+| `07-n8n-agents/23-market-data-staleness-agent` | ✅ Requirements ✅ Design ✅ Tasks | Feed freshness, crossed-quote detection, blockRiskCalc gate |
+| `07-n8n-agents/24-schema-contract-drift-agent` | ✅ Requirements ✅ Design ✅ Tasks | Schema compatibility, consumer impact, breaking-change flag |
+| `07-n8n-agents/25-cutoff-calendar-agent` | ✅ Requirements ✅ Design ✅ Tasks | Post-cutoff event detection, holdForNextDay gate |
+| `07-n8n-agents/26-contagion-analysis-agent` | ✅ Requirements ✅ Design ✅ Tasks | Neo4j blast radius — trades/books/regions affected |
+| `07-n8n-agents/27-service-genome-agent` | ✅ Requirements ✅ Design ✅ Tasks | Service knowledge profile, fragility prediction |
+| `07-n8n-agents/28-adaptive-routing-agent` | ✅ Requirements ✅ Design ✅ Tasks | Runtime routing policy proposal, rules validation, HITL apply |
+| `07-n8n-agents/29-capacity-backlog-agent` | ✅ Requirements ✅ Design ✅ Tasks | Backlog vs deadline, replica scaling proposal |
+| `07-n8n-agents/30-retry-storm-agent` | ✅ Requirements ✅ Design ✅ Tasks | Retry amplification, breaker cascade, HITL backpressure |
+| `07-n8n-agents/31-finops-cost-agent` | ✅ Requirements ✅ Design ✅ Tasks | Cost anomaly, deploy-to-cost correlation, rightsizing |
+| `07-n8n-agents/32-trade-amendment-ripple-agent` | ✅ Requirements ✅ Design ✅ Tasks | Downstream effect tracking for amendments/cancellations |
+| `07-n8n-agents/33-duplicate-effect-guard` | ✅ Requirements ✅ Design ✅ Tasks | Double-booking/settlement detection, dry-run reversal |
+| `07-n8n-agents/34-transaction-recovery-agent` | ✅ Requirements ✅ Design ✅ Tasks | Investigation → Planning → Safety → Execution → Audit |
 
 ---
 
@@ -330,10 +330,10 @@ Progress is tracked at the **requirements** stage (Kiro `requirements-first` wor
 | 04-portals | 3 | 3 ✅ | 3 ✅ | 3 ✅ | 0 |
 | 05-observability | 4 | 4 ✅ | 4 ✅ | 4 ✅ | 0 |
 | 06-local-deploy | 3 | 3 ✅ | 3 ✅ | 3 ✅ | 0 |
-| 07-n8n-agents | 34 | 4 | 0 | 0 | 30 |
+| 07-n8n-agents | 34 | 34 ✅ | 34 ✅ | 34 ✅ | 0 |
 | 08-aws-deploy | 7 | 0 | 0 | 0 | 7 |
 | 09-azure-deploy | 6 | 0 | 0 | 0 | 6 |
-| **Total** | **71** | **28** | **22** | **22** | **43** |
+| **Total** | **71** | **58** | **52** | **52** | **13** |
 
 **Requirements baseline phases 01–06: COMPLETE ✅** (24 of 24 specs done, 2026-07-25)
 **Phase 02 microservices: req→design→tasks COMPLETE ✅** (all 7 bounded contexts fully specced, 2026-07-25)
