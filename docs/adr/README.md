@@ -80,3 +80,4 @@ Each ADR follows the structure:
 | [0033](0033-agentic-framework-choice.md) | Agentic AI Framework — n8n vs LangChain vs CrewAI |
 | [0034](0034-agentic-cloud-vs-local-deployment.md) | Agent Deployment — Local-First vs Cloud-Native |
 | [0035](0035-agentic-memory-architecture.md) | Agent Memory Architecture — Session, Episodic, Semantic |
+| [0036](0036-terraform-over-cloudformation.md) | Terraform over CloudFormation for IaC |
