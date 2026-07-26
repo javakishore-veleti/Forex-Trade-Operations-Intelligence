@@ -7,7 +7,7 @@
       "matcher": "\\.kiro/specs/.*\\.md$",
       "action": {
         "type": "command",
-        "command": "cd /Users/vavkkishore/kishore/runtime_data/temp_gh_repos/ai_agents/n8n-projects/Forex-Trade-Operations-Intelligence && git add .kiro/specs/ && CHANGED=$(git diff --cached --name-only) && if [ -n \"$CHANGED\" ]; then MSG=$(echo \"$CHANGED\" | head -1 | sed 's|.kiro/specs/||' | sed 's|/requirements.md||' | sed 's|/design.md||' | sed 's|/tasks.md||') && git commit -m \"feat(specs): ${MSG}\"; fi"
+        "command": "git add .kiro/specs/ && CHANGED=$(git diff --cached --name-only) && if [ -n \"$CHANGED\" ]; then MSG=$(echo \"$CHANGED\" | head -1 | sed 's|.kiro/specs/||' | sed 's|/requirements.md||' | sed 's|/design.md||' | sed 's|/tasks.md||') && git commit -m \"feat(specs): ${MSG}\"; fi"
       }
     }
   ]
