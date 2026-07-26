@@ -294,12 +294,12 @@ All implemented as n8n workflow JSON exports only. No Python agent scripts.
 
 | Spec | Status | Scope |
 |---|---|---|
-| `09-azure-deploy/01-aks-cluster` | ⬜ Not started | AKS cluster config, node pools, namespaces, managed identity, Helm chart structure |
-| `09-azure-deploy/02-azure-postgres` | ⬜ Not started | Azure Database for PostgreSQL Flexible Server, connection pooling, firewall rules |
-| `09-azure-deploy/03-azure-event-hub` | ⬜ Not started | Azure Event Hub as Kafka-compatible broker, namespace config, consumer groups, schema registry |
-| `09-azure-deploy/04-azure-cache-redis` | ⬜ Not started | Azure Cache for Redis, eviction policy, TLS, Spring Boot connection config |
-| `09-azure-deploy/05-cosmos-mongodb` | ⬜ Not started | Cosmos DB MongoDB API, partition key strategy, connection string migration from local MongoDB |
-| `09-azure-deploy/06-azure-monitor-elk` | ⬜ Not started | Azure Monitor + Log Analytics as ELK alternative, OTel → Azure Monitor pipeline, dashboard setup |
+| `09-azure-deploy/01-aks-cluster` | ✅ Requirements ✅ Design ✅ Tasks | AKS cluster config, node pools, namespaces, managed identity, Helm chart structure, AGIC ingress |
+| `09-azure-deploy/02-azure-postgres` | ✅ Requirements ✅ Design ✅ Tasks | Azure Database for PostgreSQL Flexible Server, built-in PgBouncer connection pooling, VNet integration, Flyway migration |
+| `09-azure-deploy/03-azure-event-hub` | ✅ Requirements ✅ Design ✅ Tasks | Azure Event Hub as Kafka-compatible broker, Premium namespace, consumer groups, OAUTHBEARER auth, schema registry |
+| `09-azure-deploy/04-azure-cache-redis` | ✅ Requirements ✅ Design ✅ Tasks | Azure Cache for Redis 7.x Premium clustered, TLS, Lettuce client, Entra ID auth |
+| `09-azure-deploy/05-cosmos-mongodb` | ✅ Requirements ✅ Design ✅ Tasks | Cosmos DB MongoDB API 7.0, partition key strategy, autoscale RU/s, connection string migration |
+| `09-azure-deploy/06-azure-monitor-elk` | ✅ Requirements ✅ Design ✅ Tasks | Azure Monitor + Log Analytics as ELK replacement, OTel → Azure Monitor pipeline, Application Insights, KQL queries, 8 workbooks |
 
 ---
 
@@ -332,8 +332,8 @@ Progress is tracked at the **requirements** stage (Kiro `requirements-first` wor
 | 06-local-deploy | 3 | 3 ✅ | 3 ✅ | 3 ✅ | 0 |
 | 07-n8n-agents | 34 | 34 ✅ | 34 ✅ | 34 ✅ | 0 |
 | 08-aws-deploy | 7 | 7 ✅ | 7 ✅ | 7 ✅ | 0 |
-| 09-azure-deploy | 6 | 0 | 0 | 0 | 6 |
-| **Total** | **71** | **65** | **59** | **59** | **6** |
+| 09-azure-deploy | 6 | 6 ✅ | 6 ✅ | 6 ✅ | 0 |
+| **Total** | **71** | **71** | **65** | **65** | **0** |
 
 **Requirements baseline phases 01–06: COMPLETE ✅** (24 of 24 specs done, 2026-07-25)
 **Phase 02 microservices: req→design→tasks COMPLETE ✅** (all 7 bounded contexts fully specced, 2026-07-25)
