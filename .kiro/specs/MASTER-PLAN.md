@@ -239,8 +239,8 @@ All implemented as n8n workflow JSON exports only. No Python agent scripts.
 
 | Spec | Status | Scope |
 |---|---|---|
-| `07-n8n-agents/01-supervisor-agent` | ⬜ Not started | Intent classification, sub-agent routing, session memory, multi-turn conversation |
-| `07-n8n-agents/02-trade-lifecycle-agent` | ⬜ Not started | Timeline reconstruction, gap/duplicate detection, probable cause, safe action |
+| `07-n8n-agents/01-supervisor-agent` | ✅ Requirements done | Intent classification, sub-agent routing, session memory, multi-turn conversation |
+| `07-n8n-agents/02-trade-lifecycle-agent` | ✅ Requirements done | Timeline reconstruction, gap/duplicate detection, probable cause, safe action |
 | `07-n8n-agents/03-state-divergence-agent` | ⬜ Not started | Cross-system state comparison, HITL reconciliation |
 | `07-n8n-agents/04-event-integrity-agent` | ⬜ Not started | Sequence violation handling, quarantine/pause/replay |
 | `07-n8n-agents/05-risk-explainability-agent` | ⬜ Not started | Multi-factor risk explanation, rule-trace readable, follow-up Q&A |
@@ -256,10 +256,10 @@ All implemented as n8n workflow JSON exports only. No Python agent scripts.
 | `07-n8n-agents/15-regulatory-reporting-agent` | ⬜ Not started | Completeness attestation, gap detection, resubmit gate |
 | `07-n8n-agents/16-business-kpi-guard` | ⬜ Not started | KPI anomaly, calendar-aware baseline, LLM only after anomaly |
 | `07-n8n-agents/17-change-correlation-agent` | ⬜ Not started | Deploys + rule changes correlated to business outcome shifts |
-| `07-n8n-agents/18-canary-probe-agent` | ⬜ Not started | Synthetic trade injection, per-stage liveness assertion |
+| `07-n8n-agents/18-canary-probe-agent` | ✅ Requirements done | Synthetic trade injection, per-stage liveness assertion |
 | `07-n8n-agents/19-trace-latency-agent` | ⬜ Not started | OTel per-stage latency, SLA breach root cause |
 | `07-n8n-agents/20-runtime-intent-agent` | ⬜ Not started | Behavioral clustering, suppress false alarms |
-| `07-n8n-agents/21-dlq-triage-agent` | ⬜ Not started | DLQ trigger, signature grouping, auto-replay vs quarantine |
+| `07-n8n-agents/21-dlq-triage-agent` | ✅ Requirements done | DLQ trigger, signature grouping, auto-replay vs quarantine |
 | `07-n8n-agents/22-consumer-lag-predictor` | ⬜ Not started | Completion forecast vs cutoff, HITL scale approval |
 | `07-n8n-agents/23-market-data-staleness-agent` | ⬜ Not started | Feed freshness, crossed-quote detection, blockRiskCalc gate |
 | `07-n8n-agents/24-schema-contract-drift-agent` | ⬜ Not started | Schema compatibility, consumer impact, breaking-change flag |
@@ -330,10 +330,10 @@ Progress is tracked at the **requirements** stage (Kiro `requirements-first` wor
 | 04-portals | 3 | 3 ✅ | 3 ✅ | 3 ✅ | 0 |
 | 05-observability | 4 | 4 ✅ | 4 ✅ | 4 ✅ | 0 |
 | 06-local-deploy | 3 | 3 ✅ | 3 ✅ | 3 ✅ | 0 |
-| 07-n8n-agents | 34 | 0 | 0 | 0 | 34 |
+| 07-n8n-agents | 34 | 4 | 0 | 0 | 30 |
 | 08-aws-deploy | 7 | 0 | 0 | 0 | 7 |
 | 09-azure-deploy | 6 | 0 | 0 | 0 | 6 |
-| **Total** | **71** | **24 ✅** | **22** | **22** | **47** |
+| **Total** | **71** | **28** | **22** | **22** | **43** |
 
 **Requirements baseline phases 01–06: COMPLETE ✅** (24 of 24 specs done, 2026-07-25)
 **Phase 02 microservices: req→design→tasks COMPLETE ✅** (all 7 bounded contexts fully specced, 2026-07-25)
