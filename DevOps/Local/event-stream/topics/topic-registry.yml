@@ -1,0 +1,100 @@
+# =============================================================================
+# Kafka Topic Registry — Single Source of Truth
+# =============================================================================
+# All topics follow the naming convention: fxops.{domain}.{entity}[.{qualifier}]
+# DLQ topics follow: fxops.dlq.{origin-topic-short-name}
+# Internal topics follow: fxops.internal.{processor-name}.{purpose}
+#
+# NOTE: replication-factor is set to 1 for local single-broker development only.
+# In multi-broker environments, replication-factor MUST be >= 3 with
+# min.insync.replicas = replication-factor - 1.
+# =============================================================================
+
+topics:
+  # ---------------------------------------------------------------------------
+  # Domain Event Topics
+  # ---------------------------------------------------------------------------
+
+  - name: fxops.trade.events
+    description: "All trade lifecycle domain events (TradeCaptured → TradeSettled, TradeAmended, TradeCancelled)"
+    partition-key: tradeId
+    partitions: 6
+    replication-factor: 1  # local-only — production requires >= 3
+    retention-ms: 2592000000  # 30 days
+    cleanup-policy: delete
+    schema-subject: fxops.trade.events-value
+    compatibility-mode: BACKWARD
+
+  - name: fxops.risk.results
+    description: "RiskCalculationCompleted, RiskCalculationFailed"
+    partition-key: tradeId
+    partitions: 6
+    replication-factor: 1  # local-only — production requires >= 3
+    retention-ms: 604800000  # 7 days
+    cleanup-policy: delete
+    schema-subject: fxops.risk.results-value
+    compatibility-mode: BACKWARD
+
+  - name: fxops.risk.requests
+    description: "RiskCalculationRequested"
+    partition-key: tradeId
+    partitions: 6
+    replication-factor: 1  # local-only — production requires >= 3
+    retention-ms: 604800000  # 7 days
+    cleanup-policy: delete
+    schema-subject: fxops.risk.requests-value
+    compatibility-mode: BACKWARD
+
+  - name: fxops.eod.status
+    description: "RegionalCloseStarted, RegionalCloseReady, RegionalCloseClosed, GlobalConsolidationCompleted"
+    partition-key: regionCode
+    partitions: 4
+    replication-factor: 1  # local-only — production requires >= 3
+    retention-ms: 7776000000  # 90 days
+    cleanup-policy: delete
+    schema-subject: fxops.eod.status-value
+    compatibility-mode: BACKWARD
+
+  - name: fxops.sequence.anomalies
+    description: "SequenceViolationDetected (emitted by the event-sequence-processor)"
+    partition-key: tradeId
+    partitions: 6
+    replication-factor: 1  # local-only — production requires >= 3
+    retention-ms: 2592000000  # 30 days
+    cleanup-policy: delete
+    schema-subject: fxops.sequence.anomalies-value
+    compatibility-mode: BACKWARD
+
+  # ---------------------------------------------------------------------------
+  # Dead-Letter Queue Topics
+  # ---------------------------------------------------------------------------
+
+  - name: fxops.dlq.trade-events
+    description: "DLQ for fxops.trade.events — messages that failed processing after retry exhaustion"
+    partition-key: tradeId
+    partitions: 6
+    replication-factor: 1  # local-only — production requires >= 3
+    retention-ms: 1209600000  # 14 days
+    cleanup-policy: delete  # no compaction — messages must remain retrievable
+    origin-topic: fxops.trade.events
+
+  - name: fxops.dlq.risk-requests
+    description: "DLQ for fxops.risk.requests — messages that failed processing after retry exhaustion"
+    partition-key: tradeId
+    partitions: 6
+    replication-factor: 1  # local-only — production requires >= 3
+    retention-ms: 1209600000  # 14 days
+    cleanup-policy: delete  # no compaction — messages must remain retrievable
+    origin-topic: fxops.risk.requests
+
+  # ---------------------------------------------------------------------------
+  # Internal Topics (managed by Kafka Streams — listed for documentation)
+  # ---------------------------------------------------------------------------
+
+  - name: fxops.internal.sequence-processor.facts
+    description: "Changelog topic for the event-sequence-processor state store"
+    partition-key: tradeId
+    partitions: 6
+    replication-factor: 1  # local-only
+    cleanup-policy: compact
+    managed-by: kafka-streams

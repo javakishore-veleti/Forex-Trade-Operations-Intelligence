@@ -20,6 +20,7 @@
         <module>eod-processing-service</module>
         <module>business-calendar-service</module>
         <module>state-reconciliation-service</module>
+        <module>event-sequence-processor</module>
     </modules>
 
     <properties>
@@ -29,6 +30,7 @@
         <spring-ai.version>1.0.0-M5</spring-ai.version>
         <testcontainers.version>1.20.4</testcontainers.version>
         <jqwik.version>1.9.2</jqwik.version>
+        <kafka.version>3.8.0</kafka.version>
     </properties>
 
     <dependencyManagement>

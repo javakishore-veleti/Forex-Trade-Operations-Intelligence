@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: event-sequence-processor
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+fxops:
+  sequence-processor:
+    bootstrap-servers: localhost:9092
+    application-id: fxops-event-sequence-processor
+    input-topic: fxops.trade.events
+    output-topic: fxops.sequence.anomalies
+    state-store-name: sequence-facts-store
+    grace-period: 60s
