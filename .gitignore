@@ -64,3 +64,4 @@ Thumbs.db
 
 # === Keep compose files tracked ===
 !DevOps/Local/**/docker-compose.yml
+Middleware/business-calendar-service/.jqwik-database

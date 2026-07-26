@@ -182,7 +182,7 @@ Each is a standalone Spring Boot Maven module under `Middleware/`. Built as plai
 | `02-microservices/03-trade-lifecycle-service` | ✅ Requirements ✅ Design ✅ Tasks ✅ Implemented | Trade state machine (CAPTURED→SETTLED), lifecycle transition rules, audit history, Postgres + MongoDB read/write, state query APIs |
 | `02-microservices/04-risk-calculation-service` | ✅ Requirements done | Currency pair risk calculation, Drools rules engine integration, regional/book/global aggregation, EOD risk totals, limit checking, RiskCalculationCompleted event |
 | `02-microservices/05-eod-processing-service` | ✅ Requirements done | EOD regional close orchestration, branch completion tracking, global consolidation trigger, US base calendar alignment |
-| `02-microservices/06-business-calendar-service` | ✅ Requirements done | Regional business calendars, DST/holiday rules, booking date classification, regional cutoff enforcement |
+| `02-microservices/06-business-calendar-service` | ✅ Requirements ✅ Design ✅ Tasks ✅ Implemented | Regional business calendars, DST/holiday rules, booking date classification, regional cutoff enforcement |
 | `02-microservices/07-state-reconciliation-service` | ✅ Requirements done | Cross-system canonical state (Postgres + MongoDB + Redis + Kafka), divergence detection, StateReconciliationService returning violatedInvariants + permittedActions |
 
 ---
