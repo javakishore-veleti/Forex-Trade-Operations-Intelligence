@@ -1,18 +1,21 @@
-# Diagrams
+# Architecture Diagrams
 
-Architecture and design diagrams for the FX Trade Operations Intelligence platform.
+All diagrams use Mermaid format — they render natively on GitHub without any tooling.
 
-## Planned Diagrams
+## Diagrams
 
-| Diagram | Format | Description |
-|---------|--------|-------------|
-| System Context | C4 / PlantUML | High-level system boundary and external actors |
-| Container | C4 / PlantUML | Service containers and infrastructure roles |
-| Data Flow | Mermaid | Trade lifecycle data flow |
-| Network Topology | Mermaid | Docker network topology for local stack |
+| Diagram | File | Description |
+|---------|------|-------------|
+| System Context | [system-context.md](system-context.md) | C4 Level 1 — external actors and system boundary |
+| Container Architecture | [container-architecture.md](container-architecture.md) | C4 Level 2 — all containers, stores, and relationships |
+| Trade Lifecycle Flow | [trade-lifecycle-flow.md](trade-lifecycle-flow.md) | End-to-end data flow from capture through settlement |
+| Agent Architecture | [agent-architecture.md](agent-architecture.md) | Agent triggers, routing, MCP tools, HITL gates |
+| Local Infrastructure | [local-infrastructure.md](local-infrastructure.md) | Docker Compose services, ports, and networks |
 
 ## Conventions
 
-- Use text-based diagram formats (PlantUML, Mermaid) for version control
-- Export rendered PNGs alongside source files where needed
-- All identifiers in diagrams use synthetic `FX-` prefix
+- **Format**: Mermaid (text-as-code, Git-diffable, GitHub-native rendering)
+- **C4 Model**: System Context → Container → Component (not all levels needed for every view)
+- **Identifiers**: All use synthetic `FX-` prefix
+- **No binary files**: No .drawio, .pptx, .vsdx committed (Mermaid covers all needs)
+- **Updates**: When architecture changes, update the diagram in the same PR

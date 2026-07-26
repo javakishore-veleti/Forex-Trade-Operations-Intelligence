@@ -62,6 +62,59 @@ This repo demonstrates **full-lifecycle spec-driven development**:
 
 See [Kiro-Understanding.md](Kiro-Understanding.md) for the full methodology documentation.
 
+## Architecture Overview
+
+```mermaid
+flowchart TB
+    subgraph Portals["Portals (Angular 19)"]
+        Admin[Admin Portal]
+        Desk[TraderDesk]
+        Blotter[FX Blotter]
+    end
+
+    subgraph Agents["Agent Layer (n8n)"]
+        Sup[Supervisor Agent]
+        Spec[34 Specialized Agents]
+        HITL[HITL Approval Gate]
+    end
+
+    subgraph Middleware["Middleware (Spring Boot / Java 21)"]
+        Ingest[Trade Ingest]
+        Life[Trade Lifecycle]
+        Risk[Risk Calculation]
+        EOD[EOD Processing]
+        Cal[Business Calendar]
+        Recon[State Reconciliation]
+        Seq[Event Sequence Processor]
+    end
+
+    subgraph Sidecars["Detection Sidecars (Python)"]
+        KPI[KPI Anomaly]
+        DLQ[DLQ Cluster]
+        Cap[Capacity Forecast]
+        Log[Log Normalizer]
+    end
+
+    subgraph Infra["Infrastructure"]
+        PG[(PostgreSQL)]
+        Mongo[(MongoDB)]
+        Redis[(Redis)]
+        Neo4j[(Neo4j)]
+        Vec[(pgvector)]
+        Kafka[Kafka]
+    end
+
+    Portals -->|REST API| Middleware
+    Agents -->|MCP Tools| Middleware
+    Sidecars -->|Webhook| Agents
+    Middleware --> Kafka
+    Middleware --> PG & Mongo & Redis
+    Seq --> Kafka
+    Agents -.->|Risk M/H| HITL
+```
+
+> See [docs/diagrams/](docs/diagrams/) for detailed C4, data-flow, and infrastructure diagrams.
+
 ## Quick Start
 
 ```bash
