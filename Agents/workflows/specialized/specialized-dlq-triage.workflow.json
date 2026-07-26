@@ -1,0 +1,478 @@
+{
+  "name": "Specialized — DLQ Triage & Remediation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dlq-cluster",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "dlq-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "dlq-cluster-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.clusters && $json.body.clusters.length > 0 && $json.body.clusters[0].cluster_id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ]
+        }
+      },
+      "id": "dlq-node-002",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ERROR', error: 'Malformed payload: missing required fields (clusters[] with cluster_id, count, representative_trace)', timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "dlq-node-003",
+      "name": "Log Error and Stop",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 480]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "dlq-node-004",
+      "name": "Split Clusters",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a DLQ (Dead Letter Queue) triage analyst for an FX trade operations platform.\n\nGiven a failure cluster from the dlq-cluster-analyzer sidecar, classify it as TRANSIENT or POISON.\n\nTRANSIENT indicators (replay would succeed):\n- ConnectTimeoutException, SocketTimeoutException\n- HTTP 503 Service Unavailable, 504 Gateway Timeout\n- Connection refused (downstream was temporarily down)\n- Transient network partition\n- Service has since recovered (recent messages succeeding)\n\nPOISON indicators (replay would fail again):\n- SchemaValidationException, JsonParseException\n- Deserialization errors (class not found, type mismatch)\n- Business rule violations (null required field, invalid state transition)\n- Data integrity violations (FK constraint, unique key)\n- Logical errors in payload content\n\nRules:\n- If confidence is LOW, default to POISON (safer to quarantine than replay uncertain messages)\n- Consider message age: very old messages (>24h) may be stale regardless\n- Consider cluster size: large clusters of same error = likely systemic transient\n\nReturn ONLY valid JSON:\n{\n  \"classification\": \"TRANSIENT\",\n  \"confidence\": \"high\",\n  \"reasoning\": \"ConnectTimeoutException to enrichment-service. Cluster of 42 messages over 90 minutes suggests transient downstream outage. Service is likely recovered based on recent activity.\",\n  \"messageAge\": \"recent\",\n  \"replayLikelihood\": \"high\"\n}",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Failure cluster to classify:\n- Cluster ID: {{ $json.cluster_id }}\n- Message count: {{ $json.count }}\n- Representative trace: {{ $json.representative_trace }}\n- Affected topic: {{ $json.affected_topic || 'unknown' }}\n- Affected service: {{ $json.affected_service || 'unknown' }}\n- Error code: {{ $json.error_code || 'none' }}\n- First seen: {{ $json.first_seen }}\n- Last seen: {{ $json.last_seen }}\n- Sample trade IDs: {{ JSON.stringify($json.sample_trade_ids) }}\n\nClassify this failure cluster as TRANSIENT or POISON."
+      },
+      "id": "dlq-node-005",
+      "name": "Classify Cluster",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "outputKey": "TRANSIENT",
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output }}",
+                    "rightValue": "TRANSIENT",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "POISON",
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output }}",
+                    "rightValue": "POISON",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "POISON"
+        }
+      },
+      "id": "dlq-node-006",
+      "name": "Classification Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8082/mcp/evaluateCanonicalState",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeIds: $('Split Clusters').item.json.sample_trade_ids || [], clusterId: $('Split Clusters').item.json.cluster_id }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "dlq-node-007a",
+      "name": "Check Divergence (Replay Path)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8082/mcp/evaluateCanonicalState",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeIds: $('Split Clusters').item.json.sample_trade_ids || [], clusterId: $('Split Clusters').item.json.cluster_id }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "dlq-node-007b",
+      "name": "Check Divergence (Quarantine Path)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 420]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a DLQ remediation proposal writer for an FX trade operations platform.\n\nGenerate a REPLAY PROPOSAL for a transient failure cluster. This proposal will be presented to a human operator for approval.\n\nInclude:\n1. Number of messages to replay\n2. Affected topic and service\n3. Sample trade IDs (max 10)\n4. Root cause summary (why transient)\n5. Estimated impact of replay (what will happen when messages are replayed)\n6. Divergence status (if state divergence was detected)\n7. Risk level: M (requires human approval)\n\nReturn valid JSON:\n{\n  \"proposal\": \"Replay 42 messages from trade-enrichment-dlq...\",\n  \"messageCount\": 42,\n  \"affectedTopic\": \"trade-enrichment-dlq\",\n  \"affectedService\": \"enrichment-service\",\n  \"sampleTradeIds\": [\"FX-000001\", \"...\"],\n  \"rootCause\": \"ConnectTimeoutException - transient downstream outage\",\n  \"estimatedImpact\": \"42 trades will resume enrichment processing\",\n  \"divergenceDetected\": false,\n  \"riskLevel\": \"M\",\n  \"requiresApproval\": true\n}",
+          "temperature": 0.2
+        },
+        "promptType": "define",
+        "text": "=Cluster details:\n- Cluster ID: {{ $('Split Clusters').item.json.cluster_id }}\n- Count: {{ $('Split Clusters').item.json.count }}\n- Error: {{ $('Split Clusters').item.json.representative_trace }}\n- Topic: {{ $('Split Clusters').item.json.affected_topic }}\n- Service: {{ $('Split Clusters').item.json.affected_service }}\n- Trade IDs: {{ JSON.stringify($('Split Clusters').item.json.sample_trade_ids) }}\n\nClassification: {{ $('Classify Cluster').item.json.output }}\n\nDivergence check result:\n{{ JSON.stringify($json) }}\n\nGenerate a replay proposal for human review."
+      },
+      "id": "dlq-node-008",
+      "name": "Generate Replay Proposal",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1540, 180]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a DLQ quarantine proposal writer for an FX trade operations platform.\n\nGenerate a QUARANTINE PROPOSAL for a poison message cluster. This proposal will be presented to a human operator for approval.\n\nInclude:\n1. Root cause (why these are poison — structural/permanent failure)\n2. Number of messages to quarantine\n3. Sample message content description (sanitized, synthetic IDs only)\n4. Recommended investigation steps for the owning team\n5. Which team/service owns the fix\n6. Impact of quarantining (messages removed from retry path)\n\nReturn valid JSON:\n{\n  \"proposal\": \"Quarantine 5 messages with SchemaValidationException...\",\n  \"messageCount\": 5,\n  \"rootCause\": \"SchemaValidationException: field 'notional' type mismatch (expected Number, got String)\",\n  \"affectedService\": \"enrichment-service\",\n  \"owningTeam\": \"enrichment-team\",\n  \"investigationSteps\": [\"Check schema version compatibility\", \"Review recent schema changes\"],\n  \"divergenceDetected\": false,\n  \"riskLevel\": \"M\",\n  \"requiresApproval\": true\n}",
+          "temperature": 0.2
+        },
+        "promptType": "define",
+        "text": "=Cluster details:\n- Cluster ID: {{ $('Split Clusters').item.json.cluster_id }}\n- Count: {{ $('Split Clusters').item.json.count }}\n- Error: {{ $('Split Clusters').item.json.representative_trace }}\n- Topic: {{ $('Split Clusters').item.json.affected_topic }}\n- Service: {{ $('Split Clusters').item.json.affected_service }}\n- Trade IDs: {{ JSON.stringify($('Split Clusters').item.json.sample_trade_ids) }}\n\nClassification: {{ $('Classify Cluster').item.json.output }}\n\nDivergence check result:\n{{ JSON.stringify($json) }}\n\nGenerate a quarantine proposal for human review."
+      },
+      "id": "dlq-node-009",
+      "name": "Generate Quarantine Proposal",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1540, 420]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "dlq-replay-approval",
+          "timeout": "4h"
+        }
+      },
+      "id": "dlq-node-010",
+      "name": "HITL Gate Replay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1760, 180]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "dlq-quarantine-approval",
+          "timeout": "4h"
+        }
+      },
+      "id": "dlq-node-011",
+      "name": "HITL Gate Quarantine",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1760, 420]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "dlq-node-012a",
+      "name": "Replay Approval Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1980, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "dlq-node-012b",
+      "name": "Quarantine Approval Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1980, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8082/mcp/replayDlqMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ clusterId: $('Split Clusters').item.json.cluster_id, messageKeys: $('Split Clusters').item.json.sample_trade_ids, approvalReference: $json.body.approvalReference, approverUserId: $json.body.approverUserId, topic: $('Split Clusters').item.json.affected_topic }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "M"
+            },
+            {
+              "name": "X-Approval-Reference",
+              "value": "={{ $json.body.approvalReference }}"
+            }
+          ]
+        }
+      },
+      "id": "dlq-node-013",
+      "name": "Replay Messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://state-reconciliation-service:8082/mcp/quarantineMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ clusterId: $('Split Clusters').item.json.cluster_id, messageKeys: $('Split Clusters').item.json.sample_trade_ids, approvalReference: $json.body.approvalReference, approverUserId: $json.body.approverUserId, reason: $('Generate Quarantine Proposal').item.json.output, topic: $('Split Clusters').item.json.affected_topic }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "M"
+            },
+            {
+              "name": "X-Approval-Reference",
+              "value": "={{ $json.body.approvalReference }}"
+            }
+          ]
+        }
+      },
+      "id": "dlq-node-014",
+      "name": "Quarantine Messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 360]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'DENIED', clusterId: $('Split Clusters').item.json.cluster_id, action: 'replay', decision: 'reviewed-not-replayed', deniedBy: $json.body.approverUserId || 'unknown', timestamp: new Date().toISOString() }) }}"
+      },
+      "id": "dlq-node-015a",
+      "name": "Log Replay Denial",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2200, 240]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'DENIED', clusterId: $('Split Clusters').item.json.cluster_id, action: 'quarantine', decision: 'reviewed-not-quarantined', deniedBy: $json.body.approverUserId || 'unknown', timestamp: new Date().toISOString() }) }}"
+      },
+      "id": "dlq-node-015b",
+      "name": "Log Quarantine Denial",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2200, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'SUCCESS', agentId: 'dlq-triage-remediation', clustersProcessed: $('Webhook Trigger').item.json.body.clusters.length, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "dlq-node-016",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2420, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Validate Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate Payload": {
+      "main": [
+        [{ "node": "Split Clusters", "type": "main", "index": 0 }],
+        [{ "node": "Log Error and Stop", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split Clusters": {
+      "main": [
+        [{ "node": "Classify Cluster", "type": "main", "index": 0 }]
+      ]
+    },
+    "Classify Cluster": {
+      "main": [
+        [{ "node": "Classification Router", "type": "main", "index": 0 }]
+      ]
+    },
+    "Classification Router": {
+      "main": [
+        [{ "node": "Check Divergence (Replay Path)", "type": "main", "index": 0 }],
+        [{ "node": "Check Divergence (Quarantine Path)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Divergence (Replay Path)": {
+      "main": [
+        [{ "node": "Generate Replay Proposal", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Divergence (Quarantine Path)": {
+      "main": [
+        [{ "node": "Generate Quarantine Proposal", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generate Replay Proposal": {
+      "main": [
+        [{ "node": "HITL Gate Replay", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generate Quarantine Proposal": {
+      "main": [
+        [{ "node": "HITL Gate Quarantine", "type": "main", "index": 0 }]
+      ]
+    },
+    "HITL Gate Replay": {
+      "main": [
+        [{ "node": "Replay Approval Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "HITL Gate Quarantine": {
+      "main": [
+        [{ "node": "Quarantine Approval Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Replay Approval Check": {
+      "main": [
+        [{ "node": "Replay Messages", "type": "main", "index": 0 }],
+        [{ "node": "Log Replay Denial", "type": "main", "index": 0 }]
+      ]
+    },
+    "Quarantine Approval Check": {
+      "main": [
+        [{ "node": "Quarantine Messages", "type": "main", "index": 0 }],
+        [{ "node": "Log Quarantine Denial", "type": "main", "index": 0 }]
+      ]
+    },
+    "Replay Messages": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    },
+    "Quarantine Messages": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Replay Denial": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Quarantine Denial": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "dlq-triage" },
+    { "name": "agent" },
+    { "name": "mvp-phase-1" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

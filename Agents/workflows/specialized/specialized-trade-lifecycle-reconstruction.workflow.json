@@ -1,0 +1,286 @@
+{
+  "name": "Specialized — Trade Lifecycle Reconstruction",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trade-lifecycle",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "tlc-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "trade-lifecycle-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getTrade",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $json.body.tradeId, correlationId: $json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "tlc-node-002",
+      "name": "Get Trade",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "FAILURE",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "tlc-node-003",
+      "name": "Error Check getTrade",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'FAILURE', error: 'Trade not found', tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "tlc-node-004",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getTradeEvents",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "tlc-node-005",
+      "name": "Get Trade Events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getTradeTimeline",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Webhook Trigger').item.json.body.tradeId, correlationId: $('Webhook Trigger').item.json.body.correlationId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "tlc-node-006",
+      "name": "Get Trade Timeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a trade lifecycle anomaly detector for an FX trade operations platform.\n\nGiven a trade's current state, event history, and annotated timeline, identify lifecycle anomalies:\n\n1. MISSING_EVENT: An expected lifecycle event that has not occurred within the SLA window.\n2. DUPLICATED_EVENT: The same event type observed more than once (excluding legitimate replays with distinct idempotency keys).\n3. OUT_OF_ORDER_EVENT: An event that arrived before its prerequisite in the lifecycle state machine.\n4. UNEXPECTED_TERMINAL: The trade is in a terminal state (FAILED, CANCELLED) that was not expected.\n\nExpected lifecycle order: CAPTURED → VALIDATED → ENRICHED → RISK_CALCULATED → BOOKED → SETTLED\n\nReturn ONLY valid JSON:\n{\n  \"anomalies\": [\n    {\n      \"type\": \"MISSING_EVENT\",\n      \"expectedStage\": \"ENRICHED\",\n      \"observedState\": \"VALIDATED\",\n      \"elapsedMinutes\": 45,\n      \"slaMet\": false,\n      \"stageOwner\": \"enrichment-service\"\n    }\n  ],\n  \"isNormal\": false,\n  \"currentStage\": \"VALIDATED\",\n  \"expectedNextEvent\": \"ENRICHED\"\n}\n\nIf no anomalies are detected, return:\n{\n  \"anomalies\": [],\n  \"isNormal\": true,\n  \"currentStage\": \"SETTLED\",\n  \"expectedNextEvent\": null\n}",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Trade state:\n{{ JSON.stringify($('Get Trade').item.json) }}\n\nTrade events:\n{{ JSON.stringify($('Get Trade Events').item.json) }}\n\nTrade timeline:\n{{ JSON.stringify($json) }}\n\nAnalyze this trade's lifecycle for anomalies."
+      },
+      "id": "tlc-node-007",
+      "name": "Anomaly Detection",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://vector-store:8090/api/similar-failures",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $json.output, topK: 3, threshold: 0.7 }) }}",
+        "options": {
+          "timeout": 5000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "tlc-node-008",
+      "name": "Similar Failure Retrieval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a causal analyst for FX trade lifecycle failures.\n\nGiven:\n- The trade's current state and timeline\n- Detected anomalies (from the anomaly detection step)\n- Similar past failures (from vector retrieval)\n- The trade's permitted actions (from the tool envelope)\n\nDetermine:\n1. PROBABLE CAUSE: Which service, rule, or condition caused each anomaly. Base this ONLY on facts from the tool data. Never hallucinate service names or error codes.\n2. CONFIDENCE: high/medium/low based on evidence strength.\n3. RECOMMENDED ACTIONS: ONLY from the permittedActions list in the tool envelope. Never invent actions. Present in priority order (safest first).\n4. SIMILAR CASES: Reference similar past failures if found.\n\nReturn valid JSON:\n{\n  \"probableCause\": {\n    \"service\": \"enrichment-service\",\n    \"reason\": \"Service received trade but did not emit ENRICHED event within SLA\",\n    \"confidence\": \"high\",\n    \"evidenceSummary\": \"Timeline shows VALIDATED at 10:00, no subsequent event for 45 minutes\"\n  },\n  \"recommendedActions\": [\n    {\n      \"action\": \"requestReprocessing\",\n      \"description\": \"Request the enrichment service to reprocess this trade\",\n      \"riskLevel\": \"M\",\n      \"requiresHITL\": true,\n      \"preconditions\": [\"Verify enrichment-service is healthy\"]\n    }\n  ],\n  \"similarCases\": [\n    {\n      \"tradeId\": \"FX-000088\",\n      \"anomalyType\": \"MISSING_EVENT\",\n      \"rootCause\": \"enrichment-service OOM crash\",\n      \"resolution\": \"Service restarted; trade reprocessed successfully\"\n    }\n  ],\n  \"explanation\": \"Trade FX-000101 is stuck at VALIDATED stage. The enrichment-service appears to have failed to process this trade...\"\n}\n\nIf no anomalies exist, return a confirmation of normal lifecycle progress.",
+          "temperature": 0.2
+        },
+        "promptType": "define",
+        "text": "=Trade state:\n{{ JSON.stringify($('Get Trade').item.json) }}\n\nDetected anomalies:\n{{ $('Anomaly Detection').item.json.output }}\n\nSimilar past failures:\n{{ JSON.stringify($json) }}\n\nPermitted actions from trade service:\n{{ JSON.stringify($('Get Trade').item.json.permittedActions || []) }}\n\nProvide causal analysis and safe action recommendations."
+      },
+      "id": "tlc-node-009",
+      "name": "Reasoning and Recommendation",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1760, 300]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'SUCCESS', agentId: 'trade-lifecycle-reconstruction', correlationId: $('Webhook Trigger').item.json.body.correlationId, tradeId: $('Webhook Trigger').item.json.body.tradeId, riskLevel: 'L', facts: { tradeState: $('Get Trade').item.json, anomalyAnalysis: $('Anomaly Detection').item.json.output }, reasoning: $json.output, timestamp: new Date().toISOString() }) }}"
+      },
+      "id": "tlc-node-010",
+      "name": "Format AgentEnvelope",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1980, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "tlc-node-011",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2200, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Get Trade", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Trade": {
+      "main": [
+        [{ "node": "Error Check getTrade", "type": "main", "index": 0 }]
+      ]
+    },
+    "Error Check getTrade": {
+      "main": [
+        [{ "node": "Error Response", "type": "main", "index": 0 }],
+        [{ "node": "Get Trade Events", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Trade Events": {
+      "main": [
+        [{ "node": "Get Trade Timeline", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Trade Timeline": {
+      "main": [
+        [{ "node": "Anomaly Detection", "type": "main", "index": 0 }]
+      ]
+    },
+    "Anomaly Detection": {
+      "main": [
+        [{ "node": "Similar Failure Retrieval", "type": "main", "index": 0 }]
+      ]
+    },
+    "Similar Failure Retrieval": {
+      "main": [
+        [{ "node": "Reasoning and Recommendation", "type": "main", "index": 0 }]
+      ]
+    },
+    "Reasoning and Recommendation": {
+      "main": [
+        [{ "node": "Format AgentEnvelope", "type": "main", "index": 0 }]
+      ]
+    },
+    "Format AgentEnvelope": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "trade-lifecycle" },
+    { "name": "agent" },
+    { "name": "mvp-phase-1" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

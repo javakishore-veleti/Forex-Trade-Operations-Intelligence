@@ -1,0 +1,388 @@
+{
+  "name": "Specialized — Canary Probe (Synthetic Business Liveness)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "can-node-001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ regions: [ { name: 'APAC', currencyPairs: ['USD/SGD', 'AUD/JPY', 'EUR/JPY'] }, { name: 'EMEA', currencyPairs: ['EUR/USD', 'GBP/USD', 'EUR/GBP'] }, { name: 'AMER', currencyPairs: ['USD/CAD', 'USD/MXN', 'USD/BRL'] } ], slasSeconds: { CAPTURED_TO_VALIDATED: 30, VALIDATED_TO_ENRICHED: 60, ENRICHED_TO_RISK_CALCULATED: 120, RISK_CALCULATED_TO_BOOKED: 60 }, probeTimestamp: new Date().toISOString() }) }}"
+      },
+      "id": "can-node-002",
+      "name": "Get Active Regions",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "can-node-003",
+      "name": "Loop Regions",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/injectSyntheticTrade",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $json.name, currencyPair: $json.currencyPairs[Math.floor(Math.random() * $json.currencyPairs.length)], synthetic: true, tradeIdPrefix: 'FX-CANARY-' + $json.name + '-' + Date.now(), probeTimestamp: $('Get Active Regions').item.json.probeTimestamp }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Probe-Type",
+              "value": "canary-synthetic"
+            }
+          ]
+        }
+      },
+      "id": "can-node-004",
+      "name": "Inject Synthetic Trade",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/getTrade",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $json.tradeId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "can-node-005",
+      "name": "Verify Synthetic Flag",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.synthetic }}",
+              "rightValue": "true",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "can-node-006",
+      "name": "Critical Flag Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://alerting-service:9090/api/alerts",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ severity: 'CRITICAL', source: 'canary-probe-agent', title: 'SYNTHETIC FLAG MISSING - HALT ALL INJECTIONS', description: 'Injected synthetic trade ' + $('Inject Synthetic Trade').item.json.tradeId + ' is missing the synthetic=true flag. All canary injections halted immediately.', tradeId: $('Inject Synthetic Trade').item.json.tradeId, region: $('Loop Regions').item.json.name, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "can-node-007",
+      "name": "Critical Alert - Missing Flag",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 480]
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 120,
+        "unit": "seconds"
+      },
+      "id": "can-node-008",
+      "name": "Wait for SLA Window",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1540, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/traceSyntheticProgress",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $('Inject Synthetic Trade').item.json.tradeId }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "can-node-009",
+      "name": "Trace Progress",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deterministic SLA assertion — no LLM needed for happy path\nconst progress = $input.item.json;\nconst slas = $('Get Active Regions').item.json.slasSeconds;\n\nconst stages = ['CAPTURED', 'VALIDATED', 'ENRICHED', 'RISK_CALCULATED', 'BOOKED'];\nconst currentStage = progress.currentStage;\nconst stageTimestamps = progress.stageTimestamps || {};\n\nlet stuck = false;\nlet stuckStage = null;\nlet elapsedSeconds = 0;\nlet expectedSla = 0;\n\n// Check if we've progressed past minimum expected stage for elapsed time\nconst totalElapsed = (Date.now() - new Date(progress.injectedAt).getTime()) / 1000;\n\nif (currentStage === 'CAPTURED' && totalElapsed > slas.CAPTURED_TO_VALIDATED) {\n  stuck = true;\n  stuckStage = 'VALIDATED';\n  elapsedSeconds = totalElapsed;\n  expectedSla = slas.CAPTURED_TO_VALIDATED;\n} else if (currentStage === 'VALIDATED' && totalElapsed > (slas.CAPTURED_TO_VALIDATED + slas.VALIDATED_TO_ENRICHED)) {\n  stuck = true;\n  stuckStage = 'ENRICHED';\n  elapsedSeconds = totalElapsed - slas.CAPTURED_TO_VALIDATED;\n  expectedSla = slas.VALIDATED_TO_ENRICHED;\n} else if (currentStage === 'ENRICHED' && totalElapsed > (slas.CAPTURED_TO_VALIDATED + slas.VALIDATED_TO_ENRICHED + slas.ENRICHED_TO_RISK_CALCULATED)) {\n  stuck = true;\n  stuckStage = 'RISK_CALCULATED';\n  elapsedSeconds = totalElapsed - slas.CAPTURED_TO_VALIDATED - slas.VALIDATED_TO_ENRICHED;\n  expectedSla = slas.ENRICHED_TO_RISK_CALCULATED;\n}\n\nreturn [{\n  json: {\n    stuck,\n    stuckStage,\n    currentStage,\n    elapsedSeconds: Math.round(elapsedSeconds),\n    expectedSlaSecs: expectedSla,\n    tradeId: $('Inject Synthetic Trade').item.json.tradeId,\n    region: $('Loop Regions').item.json.name,\n    probeTimestamp: $('Get Active Regions').item.json.probeTimestamp,\n    stageTimestamps\n  }\n}];"
+      },
+      "id": "can-node-010",
+      "name": "SLA Assertion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.stuck }}",
+              "rightValue": "true",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "can-node-011",
+      "name": "Stuck Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://trade-lifecycle-service:8081/mcp/assertExpectedLifecycle",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tradeId: $json.tradeId, expectedStage: $json.stuckStage, currentStage: $json.currentStage, elapsedSeconds: $json.elapsedSeconds }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "can-node-012",
+      "name": "Assert Expected Lifecycle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2420, 180]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a pipeline health diagnostician for an FX trade operations platform.\n\nA synthetic canary trade is stuck at a pipeline stage beyond its SLA. Given the assertion failure details, diagnose why the stage may be stuck.\n\nRules:\n- Base your analysis ONLY on the provided data (trade state, stage timestamps, assertion result)\n- Identify which service owns the stuck stage\n- Suggest a probable cause based on the evidence\n- Provide a remediation hint\n- Do NOT speculate beyond the data\n\nReturn valid JSON:\n{\n  \"diagnosis\": \"The enrichment-service appears unresponsive for EMEA trades...\",\n  \"probableService\": \"enrichment-service\",\n  \"confidence\": \"medium\",\n  \"remediationHint\": \"Check enrichment-service health and scaling\"\n}",
+          "temperature": 0.2
+        },
+        "promptType": "define",
+        "text": "=Stuck canary trade details:\n- Trade ID: {{ $('SLA Assertion').item.json.tradeId }}\n- Region: {{ $('SLA Assertion').item.json.region }}\n- Current stage: {{ $('SLA Assertion').item.json.currentStage }}\n- Expected stage: {{ $('SLA Assertion').item.json.stuckStage }}\n- Elapsed: {{ $('SLA Assertion').item.json.elapsedSeconds }}s (SLA: {{ $('SLA Assertion').item.json.expectedSlaSecs }}s)\n- Assertion result: {{ JSON.stringify($json) }}\n\nDiagnose why this pipeline stage is stuck."
+      },
+      "id": "can-node-013",
+      "name": "Diagnose Stuck Stage",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [2640, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://eod-processing-service:8084/mcp/openBusinessDegradation",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ region: $('SLA Assertion').item.json.region, stuckStage: $('SLA Assertion').item.json.stuckStage, tradeId: $('SLA Assertion').item.json.tradeId, elapsedSeconds: $('SLA Assertion').item.json.elapsedSeconds, slaSecs: $('SLA Assertion').item.json.expectedSlaSecs, diagnosis: $json.output, probeTimestamp: $('Get Active Regions').item.json.probeTimestamp }) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Risk-Level",
+              "value": "M"
+            }
+          ]
+        }
+      },
+      "id": "can-node-014",
+      "name": "Open Business Degradation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2860, 180]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "canary-approval",
+          "timeout": "1h"
+        }
+      },
+      "id": "can-node-015",
+      "name": "Wait for Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3080, 180]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ status: 'PASS', region: $('Loop Regions').item.json.name, tradeId: $('Inject Synthetic Trade').item.json.tradeId, currentStage: $('SLA Assertion').item.json.currentStage, elapsedSeconds: $('SLA Assertion').item.json.elapsedSeconds, probeTimestamp: $('Get Active Regions').item.json.probeTimestamp, message: 'All stages within SLA' }) }}"
+      },
+      "id": "can-node-016",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2420, 420]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [{ "node": "Get Active Regions", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Active Regions": {
+      "main": [
+        [{ "node": "Loop Regions", "type": "main", "index": 0 }]
+      ]
+    },
+    "Loop Regions": {
+      "main": [
+        [{ "node": "Inject Synthetic Trade", "type": "main", "index": 0 }]
+      ]
+    },
+    "Inject Synthetic Trade": {
+      "main": [
+        [{ "node": "Verify Synthetic Flag", "type": "main", "index": 0 }]
+      ]
+    },
+    "Verify Synthetic Flag": {
+      "main": [
+        [{ "node": "Critical Flag Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Critical Flag Check": {
+      "main": [
+        [{ "node": "Wait for SLA Window", "type": "main", "index": 0 }],
+        [{ "node": "Critical Alert - Missing Flag", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait for SLA Window": {
+      "main": [
+        [{ "node": "Trace Progress", "type": "main", "index": 0 }]
+      ]
+    },
+    "Trace Progress": {
+      "main": [
+        [{ "node": "SLA Assertion", "type": "main", "index": 0 }]
+      ]
+    },
+    "SLA Assertion": {
+      "main": [
+        [{ "node": "Stuck Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Stuck Check": {
+      "main": [
+        [{ "node": "Assert Expected Lifecycle", "type": "main", "index": 0 }],
+        [{ "node": "Log Success", "type": "main", "index": 0 }]
+      ]
+    },
+    "Assert Expected Lifecycle": {
+      "main": [
+        [{ "node": "Diagnose Stuck Stage", "type": "main", "index": 0 }]
+      ]
+    },
+    "Diagnose Stuck Stage": {
+      "main": [
+        [{ "node": "Open Business Degradation", "type": "main", "index": 0 }]
+      ]
+    },
+    "Open Business Degradation": {
+      "main": [
+        [{ "node": "Wait for Approval", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [{ "node": "Loop Regions", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "specialized" },
+    { "name": "canary-probe" },
+    { "name": "agent" },
+    { "name": "mvp-phase-1" }
+  ],
+  "triggerCount": 1,
+  "active": false
+}

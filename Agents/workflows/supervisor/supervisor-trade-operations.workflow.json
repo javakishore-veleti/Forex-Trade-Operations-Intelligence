@@ -1,8 +1,421 @@
 {
   "name": "Supervisor — Trade Operations",
-  "nodes": [],
-  "connections": {},
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "supervisor-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "sup-node-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "supervisor-chat-webhook"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://redis-cache:6379/session/{{ $json.body.sessionId }}",
+        "options": {
+          "timeout": 5000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $json.body.correlationId }}"
+            }
+          ]
+        }
+      },
+      "id": "sup-node-002",
+      "name": "Load Session Memory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are an intent classifier for an FX trade operations platform. Given the user message and session context (prior entities, conversation history), classify the intent into one of these categories:\n\n- TRADE_LIFECYCLE: Questions about what happened to a trade, trade status, trade timeline, lifecycle reconstruction\n- DLQ_TRIAGE: Questions about dead-letter queue messages, failed messages, replay requests, quarantine\n- CANARY_PROBE: Questions about synthetic trade probes, business liveness, pipeline health checks\n- UNKNOWN: Cannot determine intent with sufficient confidence\n\nReturn ONLY valid JSON with this structure:\n{\n  \"intent\": \"TRADE_LIFECYCLE\",\n  \"confidence\": 0.92,\n  \"extractedEntities\": {\n    \"tradeIds\": [\"FX-000042\"],\n    \"regions\": [],\n    \"services\": []\n  }\n}\n\nRules:\n- If confidence is below 0.7, set intent to UNKNOWN\n- Extract all FX-prefixed trade IDs mentioned\n- Extract region codes (APAC, EMEA, AMER) if mentioned\n- Use session context to resolve anaphoric references (e.g., 'that trade' refers to a trade ID from prior turns)",
+          "temperature": 0
+        },
+        "promptType": "define",
+        "text": "=Session context: {{ $json.sessionMemory || '{}' }}\n\nUser message: {{ $('Webhook Trigger').item.json.body.message }}"
+      },
+      "id": "sup-node-003",
+      "name": "Intent Classifier",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "outputKey": "TRADE_LIFECYCLE",
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output }}",
+                    "rightValue": "TRADE_LIFECYCLE",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "DLQ_TRIAGE",
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output }}",
+                    "rightValue": "DLQ_TRIAGE",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "CANARY_PROBE",
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output }}",
+                    "rightValue": "CANARY_PROBE",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "UNKNOWN",
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output }}",
+                    "rightValue": "UNKNOWN",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sup-node-004",
+      "name": "Intent Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fxops-n8n:5678/webhook/trade-lifecycle",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tradeId",
+              "value": "={{ $json.extractedEntities.tradeIds[0] }}"
+            },
+            {
+              "name": "correlationId",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            },
+            {
+              "name": "userId",
+              "value": "={{ $('Webhook Trigger').item.json.body.userId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "sup-node-005a",
+      "name": "Execute Trade Lifecycle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fxops-n8n:5678/webhook/dlq-triage",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ $('Webhook Trigger').item.json.body.message }}"
+            },
+            {
+              "name": "correlationId",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "sup-node-005b",
+      "name": "Execute DLQ Triage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fxops-n8n:5678/webhook/canary-probe",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ $('Webhook Trigger').item.json.body.message }}"
+            },
+            {
+              "name": "correlationId",
+              "value": "={{ $('Webhook Trigger').item.json.body.correlationId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "sup-node-005c",
+      "name": "Execute Canary Probe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 480]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a helpful assistant for an FX trade operations platform. The user's message could not be classified to a specific agent capability. Ask a clarifying question to determine what the user needs. Be concise and suggest the types of questions you can help with: trade lifecycle investigation, DLQ message triage, or pipeline health probes.",
+          "temperature": 0.3
+        },
+        "promptType": "define",
+        "text": "=User said: {{ $('Webhook Trigger').item.json.body.message }}\n\nI could not determine your intent. Please ask a clarifying question."
+      },
+      "id": "sup-node-005d",
+      "name": "Ask Clarification",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1120, 660]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.riskLevel }}",
+              "rightValue": "L",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ]
+        }
+      },
+      "id": "sup-node-006",
+      "name": "HITL Risk Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1360, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "supervisor-approval",
+          "timeout": "4h"
+        }
+      },
+      "id": "sup-node-007",
+      "name": "Wait for Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1580, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "APPROVED",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "sup-node-008",
+      "name": "Approval Handler",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1800, 180]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a response synthesizer for an FX trade operations platform. Given one or more sub-agent AgentEnvelope responses, produce a coherent natural-language answer for the user.\n\nRules:\n- Never invent facts beyond what the AgentEnvelope(s) contain\n- Preserve all facts, violations, and permittedActions from the envelope(s)\n- Include provenance: which sub-agent(s) contributed to the answer\n- If a sub-agent returned status=FAILURE, surface the failure reason and suggest alternatives\n- Be concise but complete\n- Format recommended actions clearly with risk levels",
+          "temperature": 0.3
+        },
+        "promptType": "define",
+        "text": "=Sub-agent response(s):\n{{ JSON.stringify($json) }}\n\nOriginal user question: {{ $('Webhook Trigger').item.json.body.message }}\n\nSynthesize a coherent response for the user."
+      },
+      "id": "sup-node-009",
+      "name": "Response Synthesizer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [2040, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=http://redis-cache:6379/session/{{ $('Webhook Trigger').item.json.body.sessionId }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lastMessage",
+              "value": "={{ $('Webhook Trigger').item.json.body.message }}"
+            },
+            {
+              "name": "lastResponse",
+              "value": "={{ $json.output }}"
+            },
+            {
+              "name": "updatedAt",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "sup-node-010",
+      "name": "Save Session Memory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2260, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ sessionId: $('Webhook Trigger').item.json.body.sessionId, correlationId: $('Webhook Trigger').item.json.body.correlationId, response: $('Response Synthesizer').item.json.output, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "sup-node-011",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2480, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Load Session Memory", "type": "main", "index": 0 }]
+      ]
+    },
+    "Load Session Memory": {
+      "main": [
+        [{ "node": "Intent Classifier", "type": "main", "index": 0 }]
+      ]
+    },
+    "Intent Classifier": {
+      "main": [
+        [{ "node": "Intent Router", "type": "main", "index": 0 }]
+      ]
+    },
+    "Intent Router": {
+      "main": [
+        [{ "node": "Execute Trade Lifecycle", "type": "main", "index": 0 }],
+        [{ "node": "Execute DLQ Triage", "type": "main", "index": 0 }],
+        [{ "node": "Execute Canary Probe", "type": "main", "index": 0 }],
+        [{ "node": "Ask Clarification", "type": "main", "index": 0 }]
+      ]
+    },
+    "Execute Trade Lifecycle": {
+      "main": [
+        [{ "node": "HITL Risk Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Execute DLQ Triage": {
+      "main": [
+        [{ "node": "HITL Risk Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Execute Canary Probe": {
+      "main": [
+        [{ "node": "HITL Risk Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ask Clarification": {
+      "main": [
+        [{ "node": "Response Synthesizer", "type": "main", "index": 0 }]
+      ]
+    },
+    "HITL Risk Check": {
+      "main": [
+        [{ "node": "Wait for Approval", "type": "main", "index": 0 }],
+        [{ "node": "Response Synthesizer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait for Approval": {
+      "main": [
+        [{ "node": "Approval Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approval Handler": {
+      "main": [
+        [{ "node": "Response Synthesizer", "type": "main", "index": 0 }],
+        [{ "node": "Response Synthesizer", "type": "main", "index": 0 }]
+      ]
+    },
+    "Response Synthesizer": {
+      "main": [
+        [{ "node": "Save Session Memory", "type": "main", "index": 0 }]
+      ]
+    },
+    "Save Session Memory": {
+      "main": [
+        [{ "node": "Webhook Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
   "settings": {
-    "executionOrder": "v1"
-  }
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "supervisor" },
+    { "name": "agent" },
+    { "name": "mvp-phase-1" }
+  ],
+  "triggerCount": 1,
+  "active": false
 }
