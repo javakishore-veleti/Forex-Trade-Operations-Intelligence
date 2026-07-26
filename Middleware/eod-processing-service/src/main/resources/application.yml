@@ -1,3 +1,59 @@
 spring:
   application:
     name: eod-processing-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/eod_processing
+    username: eod_user
+    password: eod_pass
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: eod-processing-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    producer:
+      transaction-id-prefix: eod-tx-
+
+eod:
+  region-order: APAC,EMEA,AMERICAS
+  unprocessed-trade-tolerance: 0
+  peer:
+    business-calendar:
+      base-url: http://localhost:8081
+      timeout-ms: 3000
+      retry-max-attempts: 3
+      retry-backoff-ms: 500
+    risk-calculation:
+      base-url: http://localhost:8082
+      timeout-ms: 3000
+      retry-max-attempts: 3
+      retry-backoff-ms: 500
+  topics:
+    risk-snapshot: risk-snapshot-completed
+    booking-date: booking-date-classified
+    eod-completed: eod-completed
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  pattern:
+    console: "%d{ISO8601} [%thread] %-5level %logger{36} [%X{correlationId}] - %msg%n"
