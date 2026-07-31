@@ -22,8 +22,26 @@ A runtime-intelligence platform where AI agents observe live FX trade operations
 
 ---
 
+## Purpose of this Repo
+
+This repository is a **public, synthetic reference implementation** of a runtime-intelligence platform for foreign-exchange trade operations. It exists to show how AI agents can add operational intelligence around real enterprise systems **without replacing them**.
+
+Concretely, the repo demonstrates:
+
+- **Deterministic microservices first** — Spring Boot services own trade ingest, lifecycle, risk calculation, EOD processing, calendars, reconciliation, and event sequencing
+- **Agents that observe and propose** — n8n hosts a supervisor plus specialized agents that investigate anomalies and recommend actions from a fixed catalogue
+- **Human-in-the-loop control** — medium/high-risk actions require approval in the Admin Portal before any service executes them
+- **Detection beside, not inside, the trade path** — Python sidecars flag statistical anomalies and trigger agent workflows; they never process trades
+- **Operator-facing portals** — Angular apps for trading desk, blotter, and ops/risk administration
+- **Spec-driven delivery** — features move from Kiro requirements → design → tasks → code, with ADRs capturing architectural decisions
+
+It is intentionally **not** a chatbot demo, a generic “ask your database” sample, or a workplace export. All identifiers and scenarios are fictional (`FX-` prefix). Use it to study, extend, or adapt a production-shaped pattern for agent-assisted FX operations.
+
+---
+
 ## Table of Contents
 
+- [Purpose of this Repo](#purpose-of-this-repo)
 - [The Core Idea](#the-core-idea)
 - [Architecture](#architecture)
 - [What Makes This Different](#what-makes-this-different)
