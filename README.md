@@ -46,10 +46,11 @@ It is intentionally **not** a chatbot demo, a generic “ask your database” sa
 
 - [Purpose of this Repo](#purpose-of-this-repo)
 - [The Core Idea](#the-core-idea)
-- [Architecture](#architecture)
+- [Enterprise Architecture](#enterprise-architecture)
 - [What Makes This Different](#what-makes-this-different)
 - [The Agent Fleet](#the-agent-fleet)
 - [Spec-Driven Development](#spec-driven-development-kiro-methodology)
+- [Use Cases & Personas](#use-cases--personas)
 - [Quick Start](#quick-start)
 - [What's Implemented](#whats-implemented)
 - [Architectural Constraints](#architectural-constraints)
@@ -71,7 +72,144 @@ No LLM ever computes a risk figure, moves money, or advances trade state. Those 
 
 ---
 
-## Architecture
+## Enterprise Architecture
+
+Enterprise view of the platform: **who uses it**, **which capability domains it owns**, **how layers collaborate**, and **where control boundaries sit**. Detailed C4 / flow diagrams live in [docs/diagrams/](docs/diagrams/).
+
+### System context
+
+```mermaid
+flowchart LR
+    Trader[FX Trader]
+    Ops[Operations / Risk]
+    Broker[Broker / Sales Desk]
+    SRE[SRE / Platform]
+
+    subgraph Platform["FX Trade Operations Intelligence"]
+        Portals[Portals]
+        Agents[Agent Layer]
+        Services[Middleware Services]
+    end
+
+    Market[[Market Data Feeds]]
+    Settle[[Settlement Systems]]
+    Reg[[Regulatory Reporting]]
+
+    Trader --> Portals
+    Ops --> Portals
+    Broker --> Portals
+    SRE --> Portals
+    Portals --> Services
+    Agents --> Services
+    Services --> Market
+    Services --> Settle
+    Services --> Reg
+```
+
+Personas interact only through portals (and observability UIs). Agents never talk to external market/settlement systems directly — they call **MCP tools** on Spring Boot services that own those integrations.
+
+### Logical layers
+
+| Layer | Responsibility | Technology | Boundary rule |
+|-------|----------------|------------|---------------|
+| **Experience** | Role-specific UI, HITL approval inbox, investigation views | Angular 19 portals (`Admin`, `TraderDesk`, `FXTradeBlotter`) | No business writes; REST clients only |
+| **Intelligence** | Intent routing, investigation, explanation, recovery planning | n8n supervisor + 34 specialized agents | Propose/select actions; never invent payloads or compute official numbers |
+| **Detection** | Statistical / ML anomaly envelopes that trigger agents | Python sidecars | Beside the trade path — never process trades |
+| **Business services** | Trade lifecycle, risk, EOD, calendars, reconciliation, sequencing | Spring Boot / Java 21 + Drools + Kafka Streams | Sole authority for state change and arithmetic |
+| **Integration / events** | Domain events, DLQ, schema contracts | Apache Kafka | High-volume stream processing stays out of LLMs |
+| **Data** | System of record, audit, cache, graph, vectors | PostgreSQL, MongoDB, Redis, Neo4j, pgvector | Canonical trade state from services + event history |
+| **Observability** | Traces, metrics, logs, dashboards, alerts | OTel → Jaeger, Prometheus/Grafana, ELK | Correlation across technical and business signals |
+| **Delivery** | Specs, ADRs, local/cloud deploy | Kiro SDD, GitHub Actions, DevOps/Local + AWS | Spec before code; synthetic data only in public repo |
+
+### Capability domains
+
+```mermaid
+flowchart TB
+    subgraph Experience["Experience domain"]
+        A[Admin Portal]
+        T[TraderDesk]
+        B[FX Blotter]
+    end
+
+    subgraph Intelligence["Intelligence domain"]
+        SUP[Supervisor]
+        AG[Specialized agents]
+        HITL[HITL gate]
+        SC[Python sidecars]
+    end
+
+    subgraph TradeOps["Trade operations domain"]
+        IN[Trade Ingest]
+        LC[Trade Lifecycle]
+        ES[Event Sequence Processor]
+        SR[State Reconciliation]
+    end
+
+    subgraph RiskEOD["Risk & EOD domain"]
+        RK[Risk Calculation / Drools]
+        CAL[Business Calendar]
+        EOD[EOD Processing]
+    end
+
+    subgraph PlatformCore["Platform data & events"]
+        K[(Kafka)]
+        PG[(PostgreSQL)]
+        MO[(MongoDB)]
+        RD[(Redis)]
+        NJ[(Neo4j)]
+        VEC[(pgvector)]
+    end
+
+    A & T & B -->|REST| TradeOps
+    A & T & B -->|REST| RiskEOD
+    SC -->|anomaly webhook| Intelligence
+    SUP --> AG
+    AG -->|MCP tools| TradeOps
+    AG -->|MCP tools| RiskEOD
+    AG -->|M/H risk| HITL
+    HITL -->|approve/reject| A
+    TradeOps & RiskEOD --> PlatformCore
+```
+
+| Domain | Owns | Key components |
+|--------|------|----------------|
+| **Trade operations** | Capture → validate → enrich → book → settle path, event integrity, multi-store reconciliation | `trade-ingest`, `trade-lifecycle`, `event-sequence-processor`, `state-reconciliation` |
+| **Risk & EOD** | Official risk figures, rules, regional calendars, global close readiness | `risk-calculation`, `business-calendar`, `eod-processing` |
+| **Intelligence** | Investigation, explanation, recovery plans, anomaly triage | n8n agents + Python sidecars |
+| **Experience** | Persona UX and human approval | Three Angular portals |
+| **Platform** | Persistence, messaging, search/recall, observability, deploy | Kafka, polyglot stores, OTel/ELK/Grafana, DevOps |
+
+### Control & safety architecture
+
+```text
+Detect (sidecar / stream) → Investigate (agent + MCP) → Propose (fixed action catalogue)
+        → Simulate / impact report → Human approve (Admin) → Execute (Spring Boot + approval token)
+```
+
+| Control | How it is enforced |
+|---------|-------------------|
+| **Language boundary** | Java owns transactional/business logic; Python only detection/embeddings; n8n only agent workflows |
+| **Tool boundary** | Spring AI MCP tools with typed envelopes (`facts`, `violations`, `permittedActions`, `evidence`) |
+| **Action catalogue** | Agents select from fixed enums — no free-form DB/shell/Kafka admin |
+| **HITL gate** | Medium/high-risk actions pause in n8n until Admin Portal approval |
+| **Deterministic truth** | Risk, materiality, canonical state computed in services — never by the LLM |
+| **Idempotency & audit** | Redis keys, Kafka transactions/DLQ, MongoDB audit history, approval references |
+
+### Data architecture (polyglot)
+
+| Store | Role in the enterprise model |
+|-------|------------------------------|
+| **PostgreSQL** | System of record for trade/risk/EOD transactional state |
+| **MongoDB** | Append-oriented audit / document history |
+| **Redis** | Idempotency, short-lived locks, agent/session context |
+| **Kafka** | Domain event backbone; sequence processor consumes continuously |
+| **Neo4j** | Dependency / contagion / blast-radius graph |
+| **pgvector** | Prior-incident and rule-document recall for agents |
+| **ELK + Prometheus/Grafana + Jaeger** | Operational telemetry correlated to `tradeId` / `correlationId` |
+
+Canonical business state is **not** “majority vote across stores.” `state-reconciliation-service` evaluates event history and invariants; agents explain and coordinate around that result.
+
+### Runtime collaboration (reference)
 
 ```mermaid
 flowchart TB
@@ -124,7 +262,15 @@ flowchart TB
     Admin -.->|approve/reject| HITL
 ```
 
-> See [docs/diagrams/](docs/diagrams/) for C4 system context, container view, trade lifecycle flow, agent architecture, and local infrastructure diagrams.
+### Deployment architecture
+
+| Environment | Shape |
+|-------------|--------|
+| **Local** | Per-role Docker Compose under `DevOps/Local/` — stores, Kafka, n8n, OTel/Jaeger, ELK, Prometheus/Grafana; middleware and portals started via `npm run local:*` |
+| **Cloud (target)** | Independently deployable services (GitHub Actions) onto AWS/Azure patterns documented in ADRs (EKS, managed Kafka/Redis/DB equivalents) |
+| **Agent runtime** | n8n as MCP client/host; Spring Boot services expose MCP tool servers; workflow JSON is the deployment artifact under `Agents/` |
+
+> Deeper views: [system context](docs/diagrams/system-context.md) · [container architecture](docs/diagrams/container-architecture.md) · [agent architecture](docs/diagrams/agent-architecture.md) · [trade lifecycle](docs/diagrams/trade-lifecycle-flow.md) · [local infrastructure](docs/diagrams/local-infrastructure.md)
 
 ---
 
@@ -214,16 +360,27 @@ This platform serves **8 personas** across **50 documented use cases** — see [
 ## Quick Start
 
 ```bash
-# Start all local infrastructure (Postgres, Kafka, Redis, MongoDB, Neo4j, ELK, Prometheus, Grafana, n8n)
-npm run start
+# Containers (Postgres, Kafka, Redis, MongoDB, Neo4j, pgvector, n8n, OTel/Jaeger, ELK, Prometheus, Grafana)
+npm run local:containers:start-all
+npm run local:containers:status-all
+npm run local:containers:stop-all
+
+# Middleware (7 Spring Boot services on ports 8081–8087)
+npm run local:middleware:start-all
+npm run local:middleware:status-all
+npm run local:middleware:stop-all
+
+# Portals (Admin :4200, TraderDesk :4201, FXTradeBlotter :4202)
+npm run local:portals:start-all
+npm run local:portals:status-all
+npm run local:portals:stop-all
 
 # Build all microservices
 mvn -f Middleware/pom.xml verify
 
-# Check infrastructure status
+# Shortcuts (same as local:containers:*)
+npm run start
 npm run status
-
-# Stop everything
 npm run stop
 ```
 

@@ -24,10 +24,13 @@ services:
     container_name: fxops-logstash
     ports:
       - "5044:5044"
-      - "5000:5000/tcp"
-      - "5000:5000/udp"
+      # Host 5050 avoids macOS AirPlay Receiver (Control Center) on :5000
+      - "5050:5000/tcp"
+      - "5050:5000/udp"
     volumes:
+      # Only .conf may live under pipeline/ — Logstash parses every file there as config
       - ./logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - ./logstash/pipeline/index-template.json:/usr/share/logstash/templates/index-template.json:ro
     networks:
       - fxops-logging-net
     depends_on:

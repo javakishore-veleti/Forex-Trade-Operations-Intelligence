@@ -13,7 +13,7 @@ Docker Compose configurations for the FX Trade Operations Intelligence local dev
 | Event Stream | `event-stream/` | `apache/kafka:3.8.0` | 9092 | `fxops-event-net` |
 | Agent Platform | `agent-platform/` | `n8nio/n8n:1.55.0` | 5678 | `fxops-agent-net` |
 | Observability Tracing | `observability-tracing/` | `otel/opentelemetry-collector-contrib:0.104.0`, `jaegertracing/all-in-one:1.58.1` | 4317, 4318, 16686 | `fxops-tracing-net` |
-| Observability Logging | `observability-logging/` | `elasticsearch/logstash/kibana:8.15.0` | 9200, 5044, 5601 | `fxops-logging-net` |
+| Observability Logging | `observability-logging/` | `elasticsearch/logstash/kibana:8.15.0` | 9200, 5044, 5050→5000, 5601 | `fxops-logging-net` |
 | Observability Metrics | `observability-metrics/` | `prom/prometheus:v2.54.0`, `grafana/grafana:11.1.0` | 9090, 3000 | `fxops-metrics-net` |
 
 ## Network Naming Convention
@@ -22,30 +22,32 @@ All compose networks follow the pattern `fxops-{role}-net` where `{role}` identi
 
 ## Usage
 
-Start an individual role:
+Preferred (from repo root via npm):
+
+```bash
+npm run local:containers:start-all
+npm run local:containers:status-all
+npm run local:containers:stop-all
+
+npm run local:middleware:start-all
+npm run local:middleware:status-all
+npm run local:middleware:stop-all
+
+npm run local:portals:start-all
+npm run local:portals:status-all
+npm run local:portals:stop-all
+```
+
+Start an individual container role:
 
 ```bash
 cd DevOps/Local/<role-directory>
 docker compose up -d
 ```
 
-Start all roles (dependency order):
+Legacy scripts (`docker-all-up.sh`, `docker-all-down.sh`, `all-status.sh`) still exist; prefer `containers-*-all.sh` / the npm scripts above (they also pick up `.yaml` compose files and include tracing + vector-store).
 
-```bash
-./docker-all-up.sh
-```
-
-Stop all roles (reverse order):
-
-```bash
-./docker-all-down.sh
-```
-
-Check status:
-
-```bash
-./all-status.sh
-```
+PID files and logs for middleware/portals live under `.run/` (gitignored).
 
 ## Image Version Policy
 

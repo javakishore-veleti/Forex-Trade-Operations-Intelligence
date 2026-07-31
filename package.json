@@ -4,9 +4,22 @@
   "private": true,
   "description": "Runtime-intelligence platform for foreign-exchange trade operations",
   "scripts": {
-    "start": "./DevOps/Local/docker-all-up.sh",
-    "stop": "./DevOps/Local/docker-all-down.sh",
-    "status": "./DevOps/Local/all-status.sh",
+    "start": "npm run local:containers:start-all",
+    "stop": "npm run local:containers:stop-all",
+    "status": "npm run local:containers:status-all",
+
+    "local:containers:start-all": "./DevOps/Local/containers-start-all.sh",
+    "local:containers:stop-all": "./DevOps/Local/containers-stop-all.sh",
+    "local:containers:status-all": "./DevOps/Local/containers-status-all.sh",
+
+    "local:middleware:start-all": "./DevOps/Local/middleware-start-all.sh",
+    "local:middleware:stop-all": "./DevOps/Local/middleware-stop-all.sh",
+    "local:middleware:status-all": "./DevOps/Local/middleware-status-all.sh",
+
+    "local:portals:start-all": "./DevOps/Local/portals-start-all.sh",
+    "local:portals:stop-all": "./DevOps/Local/portals-stop-all.sh",
+    "local:portals:status-all": "./DevOps/Local/portals-status-all.sh",
+
     "install:portals": "cd Portals/Admin && npm install && cd ../TraderDesk && npm install && cd ../FXTradeBlotter && npm install"
   },
   "keywords": ["fx", "trade-operations", "intelligence"],

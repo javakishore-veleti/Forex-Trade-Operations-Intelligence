@@ -15,7 +15,7 @@ groups:
           team: platform
         annotations:
           summary: "High error rate on {{ $labels.service }}"
-          description: "Service {{ $labels.service }} has an error rate of {{ printf \"%.2f\" $value | float64 }}% (threshold: 5%) for more than 2 minutes."
+          description: "Service {{ $labels.service }} has an error rate of {{ $value | humanizePercentage }} (threshold: 5%) for more than 2 minutes."
 
   - name: fxops-dlq-health
     rules:

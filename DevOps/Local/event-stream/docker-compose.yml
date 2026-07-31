@@ -13,12 +13,15 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
-      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
       CLUSTER_ID: FXOpsLocalKafkaClusterId01
     ports:
       - "9092:9092"
+    # Local-only: named volume is root-owned; apache/kafka runs as uid 1000 and
+    # cannot format KRaft metadata under /tmp when the mount is not writable.
+    user: "0:0"
     volumes:
-      - fxops-kafka-data:/tmp/kraft-combined-logs
+      - fxops-kafka-data:/var/lib/kafka/data
     networks:
       - fxops-event-net
     healthcheck:
