@@ -27,7 +27,7 @@ export class ApprovalInboxComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly approvalClient: ApprovalClient,
-    private readonly config: AppConfigService
+    readonly config: AppConfigService
   ) {}
 
   ngOnInit(): void {

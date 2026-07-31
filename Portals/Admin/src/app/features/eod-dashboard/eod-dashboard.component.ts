@@ -24,7 +24,7 @@ export class EodDashboardComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly eodClient: EodClient,
-    private readonly config: AppConfigService
+    readonly config: AppConfigService
   ) {}
 
   ngOnInit(): void {

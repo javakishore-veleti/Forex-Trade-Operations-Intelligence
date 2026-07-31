@@ -17,7 +17,7 @@
   @if (trade && !loading) {
     <header class="trade-header">
       <h2>Trade Investigation: {{ trade.tradeId }}</h2>
-      <span class="status-badge" [attr.data-status]="trade.status" aria-label="Trade status: {{ trade.status }}">
+      <span class="status-badge" [attr.data-status]="trade.status" [attr.aria-label]="'Trade status: ' + trade.status">
         {{ trade.status }}
       </span>
     </header>
@@ -45,7 +45,7 @@
             <div class="timeline-content">
               <strong>{{ event.eventType }}</strong>
               <time [attr.datetime]="event.timestamp">{{ event.timestamp }}</time>
-              <span class="event-status" aria-label="Status: {{ event.status }}">{{ event.status }}</span>
+              <span class="event-status" [attr.aria-label]="'Status: ' + event.status">{{ event.status }}</span>
             </div>
           </li>
         }
@@ -60,7 +60,7 @@
           <dt>Risk Amount</dt><dd>{{ riskResult.riskAmount | number }} {{ riskResult.riskCurrency }}</dd>
           <dt>Risk Level</dt>
           <dd>
-            <span class="risk-level" [attr.data-level]="riskResult.riskLevel" aria-label="Risk level: {{ riskResult.riskLevel }}">
+            <span class="risk-level" [attr.data-level]="riskResult.riskLevel" [attr.aria-label]="'Risk level: ' + riskResult.riskLevel">
               <span class="risk-icon" aria-hidden="true">⚠</span> {{ riskResult.riskLevel }}
             </span>
           </dd>
@@ -147,12 +147,12 @@
             <h4>Available Actions</h4>
             @for (action of reconciliation.permittedActions; track action) {
               @if (actionConfirm === action) {
-                <div class="confirm-dialog" role="dialog" aria-label="Confirm action: {{ action }}">
+                <div class="confirm-dialog" role="dialog" [attr.aria-label]="'Confirm action: ' + action">
                   <p>Are you sure you want to execute <strong>{{ action }}</strong>?</p>
-                  <button (click)="executeAction(action)" class="btn btn-confirm" aria-label="Confirm {{ action }}">
+                  <button (click)="executeAction(action)" class="btn btn-confirm" [attr.aria-label]="'Confirm ' + action">
                     Confirm
                   </button>
-                  <button (click)="cancelAction()" class="btn btn-cancel" aria-label="Cancel {{ action }}">
+                  <button (click)="cancelAction()" class="btn btn-cancel" [attr.aria-label]="'Cancel ' + action">
                     Cancel
                   </button>
                 </div>

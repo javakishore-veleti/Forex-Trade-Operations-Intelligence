@@ -85,7 +85,7 @@
                 } @else if (expandedTrades.length === 0) {
                   <p class="no-trades">No trades found for this counterparty.</p>
                 } @else {
-                  <table class="inner-table" aria-label="Contributing trades for {{ cp.counterpartyName }}">
+                  <table class="inner-table" [attr.aria-label]="'Contributing trades for ' + cp.counterpartyName">
                     <thead>
                       <tr>
                         <th scope="col">Trade ID</th>

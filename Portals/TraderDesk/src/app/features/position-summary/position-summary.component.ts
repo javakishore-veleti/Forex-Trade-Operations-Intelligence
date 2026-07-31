@@ -24,7 +24,7 @@ export class PositionSummaryComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly riskClient: RiskClient,
-    private readonly config: AppConfigService
+    readonly config: AppConfigService
   ) {}
 
   ngOnInit(): void {
