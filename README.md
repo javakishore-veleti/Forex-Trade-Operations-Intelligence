@@ -24,7 +24,10 @@ A runtime-intelligence platform where AI agents observe live FX trade operations
 
 ## Purpose of this Repo
 
-This repository is a **public, synthetic reference implementation** of a runtime-intelligence platform for foreign-exchange trade operations. It exists to show how AI agents can add operational intelligence around real enterprise systems **without replacing them**.
+This repository has two complementary purposes:
+
+1. **Runtime FX intelligence** — a **public, synthetic reference implementation** of a platform where AI agents add operational intelligence around foreign-exchange trade systems **without replacing them**.
+2. **Specification-Driven Development (Kiro)** — a working example of building that platform with Kiro SDD: technology-agnostic requirements → design → atomic tasks → code, backed by ADRs and hooks in `.kiro/`.
 
 Concretely, the repo demonstrates:
 
@@ -33,9 +36,9 @@ Concretely, the repo demonstrates:
 - **Human-in-the-loop control** — medium/high-risk actions require approval in the Admin Portal before any service executes them
 - **Detection beside, not inside, the trade path** — Python sidecars flag statistical anomalies and trigger agent workflows; they never process trades
 - **Operator-facing portals** — Angular apps for trading desk, blotter, and ops/risk administration
-- **Spec-driven delivery** — features move from Kiro requirements → design → tasks → code, with ADRs capturing architectural decisions
+- **Spec-Driven Development with Kiro** — every feature is specified before implementation (`.kiro/specs/`), so the same artifacts guide humans and AI coding tools; see [Spec-Driven Development](#spec-driven-development-kiro-methodology) and [Kiro-Understanding.md](Kiro-Understanding.md)
 
-It is intentionally **not** a chatbot demo, a generic “ask your database” sample, or a workplace export. All identifiers and scenarios are fictional (`FX-` prefix). Use it to study, extend, or adapt a production-shaped pattern for agent-assisted FX operations.
+It is intentionally **not** a chatbot demo, a generic “ask your database” sample, or a workplace export. All identifiers and scenarios are fictional (`FX-` prefix). Use it to study agent-assisted FX operations, practice Kiro-style SDD, or adapt either pattern for your own systems.
 
 ---
 
